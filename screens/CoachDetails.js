@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   useWindowDimensions,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,10 +15,18 @@ import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "@react-navigation/native";
 import LessonCard from "../components/LessonCard";
 import { useCoach, useCoachLessons } from "../hooks/useCoach";
+import Navbar from "../components/Navbar";
+const { width, height } = Dimensions.get("window");
 
+const scale = width / 375;        // iPhone X width reference
+const GRID_ITEM_WIDTH = width * 0.22; 
+// The circle itself will always be 22% of the screen width
+const CIRCLE_SIZE = width * 0.2;
 export default function CoachDetailsScreen({ route }) {
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
+    const [currentTab, setCurrentTab] = useState("coach");
+  
   const coachId = route?.params?.coachId || route?.params?.coach?.id || route?.params?.coach?._id;
   const { data: coachResponse } = useCoach(coachId, { retry: false });
   const { data: lessonsResponse } = useCoachLessons(coachId, { retry: false });
@@ -54,6 +63,8 @@ export default function CoachDetailsScreen({ route }) {
   const handleLessonPress = (lesson) => {
     navigation.navigate("LessonBooking", { coach, lesson });
   };
+  const handleTabPress = (tab) => navigation.navigate(tab);
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -62,7 +73,10 @@ export default function CoachDetailsScreen({ route }) {
       {/* TOP HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="return-up-back-outline" size={28} color="#000" />
+          <Image 
+  source={require('../assets/icons/Back.png')} 
+  style={{ width: 32, height: 32, tintColor: '#000' }} 
+/>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>LESSONS</Text>
       </View>
@@ -96,15 +110,42 @@ export default function CoachDetailsScreen({ route }) {
         </Text>
 
         {/* STATS CIRCLES */}
-        <View style={styles.statsRow}>
-          <StatCircle number={String(coach.reviewsCount)} text="reviews" />
-          <StatCircle number={String(coach.studentsTaught)} text="students" />
-          <StatCircle number={String(coach.experienceYears)} text="years" />
-          <StatCircle
-            number={`${Math.round(Number(coach.recommendationValue || 0))}%`}
-            text="suggested"
-          />
-        </View>
+        <View style={styles.statsGrid}>
+      {/* Pass the dynamic CIRCLE_SIZE to your StatCircle component.
+        (You'll need to update your StatCircle component to accept and use a 'size' prop!)
+      */}
+      <View style={styles.gridItem}>
+        <StatCircle 
+          number={String(coach.reviewsCount)} 
+          text="reviews" 
+          size={CIRCLE_SIZE} 
+        />
+      </View>
+
+      <View style={styles.gridItem}>
+        <StatCircle 
+          number={String(coach.studentsTaught)} 
+          text="students" 
+          size={CIRCLE_SIZE} 
+        />
+      </View>
+
+      <View style={styles.gridItem}>
+        <StatCircle 
+          number={String(coach.experienceYears)} 
+          text="years" 
+          size={CIRCLE_SIZE} 
+        />
+      </View>
+
+      <View style={styles.gridItem}>
+        <StatCircle
+          number={`${Math.round(Number(coach.recommendationValue || 0))}%`}
+          text="suggested"
+          size={CIRCLE_SIZE}
+        />
+      </View>
+    </View>
 
         {/* LESSON LISTS */}
         <LessonSection 
@@ -131,6 +172,11 @@ export default function CoachDetailsScreen({ route }) {
         
         <View style={{ height: 40 }} /> 
       </ScrollView>
+      <Navbar
+              currentTab={currentTab}
+              onTabPress={handleTabPress}
+              onPressMiddle={() => navigation.navigate("CourseScreen")}
+            />
     </SafeAreaView>
   );
 }
@@ -187,7 +233,7 @@ const styles = StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: 26,
+    fontSize: 32 * scale,
     fontFamily: "Bebas",
     marginLeft: 15,
     color: "#222",
@@ -195,7 +241,7 @@ const styles = StyleSheet.create({
   },
 
   scrollBody: {
-    paddingBottom: 20,
+    paddingBottom: 25,
   },
 
   profileSection: {
@@ -206,8 +252,8 @@ const styles = StyleSheet.create({
   },
 
   profilePic: {
-    width: 90,
-    height: 90,
+    width: 100,
+    height: 100,
     borderRadius: 20,
   },
 
@@ -256,17 +302,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#333",
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 5,
     lineHeight: 22,
   },
 
-  statsRow: {
+ statsGrid: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    marginBottom: 25,
+    flexWrap: "wrap", 
+    justifyContent: "space-between", 
+    alignItems: "center",
+    width: "100%",
+    paddingHorizontal: width * 0.05, 
+    marginTop: 5,
   },
-
+  
+  gridItem: {
+    width: GRID_ITEM_WIDTH, 
+    alignItems: "center",
+    marginBottom: 20, 
+  },
   circle: {
     width: 75,
     height: 75,
@@ -290,8 +344,8 @@ const styles = StyleSheet.create({
   },
 
   sectionContainer: {
-    marginTop: 10,
-    marginBottom: 10,
+    marginTop: 24,
+    marginBottom: 16,
   },
 
   sectionHeader: {
@@ -299,11 +353,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 24,
   },
 
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: "Bebas",
     color: "#333",
   },

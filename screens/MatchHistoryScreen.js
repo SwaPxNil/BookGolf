@@ -204,15 +204,15 @@ export default function MatchHistoryScreen() {
               { marginHorizontal: width * 0.05, borderRadius: width * 0.035, padding: width * 0.035 },
             ]}
           >
-            <Text style={[styles.matchDate, { fontSize: width * 0.04 }]}> 
+            <Text style={[styles.matchDate, { fontSize: width * 0.048 }]}> 
               {dateText}{" "}
-              <Text style={[styles.matchTime, { fontSize: width * 0.035 }]}> 
+              <Text style={[styles.matchTime, { fontSize: width * 0.04 }]}> 
                 {timeText}
               </Text>
             </Text>
 
             <View style={styles.scoreText}>
-              <Text style={{ fontSize: width * 0.038, color: "#444", fontFamily: "Abel" }}>Score:</Text>
+              <Text style={{ fontSize: width * 0.04, color: "#444", fontFamily: "Abel" }}>Score:</Text>
               <Text style={[styles.score, { fontSize: width * 0.07 }]}> 
                 {round?.score ?? round?.total_score ?? "-"}
               </Text>

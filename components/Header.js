@@ -36,6 +36,6 @@ const styles = StyleSheet.create({
     marginTop: 4 * verticalScale,
     color: "#000000",
     fontFamily: "Abel",
-    fontSize:16
+    fontSize:18
   },
 });

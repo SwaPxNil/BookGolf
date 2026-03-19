@@ -9,6 +9,7 @@ import {
   Dimensions,
   Animated,
   RefreshControl,
+  Image,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -164,7 +165,10 @@ export default function LessonBookingScreen() {
       >
         <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
           <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-            <Ionicons name="return-up-back-outline" size={32} color="#000" />
+            <Image 
+             source={require('../assets/icons/Back.png')} 
+             style={{ width: 32, height: 32, tintColor: '#000' }} 
+           />
           </TouchableOpacity>
         </SafeAreaView>
       </ImageBackground>
@@ -353,7 +357,7 @@ const styles = StyleSheet.create({
     bottom: 0, 
     width: SCREEN_WIDTH, 
     height: BOTTOM_SHEET_HEIGHT, 
-    backgroundColor: "rgba(42, 46, 42, 0.82)", 
+    backgroundColor: "rgb(42, 46, 42)", 
     borderTopLeftRadius: 35,  
     borderTopRightRadius: 35, 
     borderWidth: 1,
@@ -449,7 +453,7 @@ const styles = StyleSheet.create({
   },
 
   summaryPill: {
-    backgroundColor: "rgba(80, 90, 80, 0.7)",
+    backgroundColor: "rgb(80, 90, 80, 0.7)",
     padding: 15,
     borderRadius: 15,
     marginTop: 5,
@@ -517,7 +521,7 @@ const styles = StyleSheet.create({
     borderRadius: 37.5,
     borderWidth: 1,
     borderColor: COLORS.white,
-    marginRight: 15,
+    marginRight: 10,
     alignItems: "center",
     justifyContent: "center",
   },

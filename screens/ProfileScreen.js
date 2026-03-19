@@ -208,13 +208,12 @@ export default function ProfileScreen() {
       <Navbar
         currentTab={currentTab}
         onTabPress={handleTabPress}
-        onPressMiddle={() => navigation.navigate("ReservationScreen")}
+        onPressMiddle={() => navigation.navigate("CourseScreen")}
       />
     </SafeAreaView>
   );
 }
 
-/* ---------------------- REUSABLE OPTION COMPONENTS ---------------------- */
 
 const Option = ({ icon, title, onPress }) => (
   <TouchableOpacity

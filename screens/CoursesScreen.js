@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  Dimensions,
   Animated,
   useWindowDimensions,
 } from "react-native";
@@ -19,17 +18,19 @@ import Navbar from "../components/Navbar";
 import { useCourses } from "../hooks/useCourse";
 import { useMyProfile } from "../hooks/useAuth";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-const ITEM_WIDTH = SCREEN_WIDTH * 0.75;
-const ITEM_SPACING = (SCREEN_WIDTH - ITEM_WIDTH) / 2;
-
 export default function CoursesScreen() {
   const navigation = useNavigation();
   const scrollX = useRef(new Animated.Value(0)).current;
   const [activeIndex, setActiveIndex] = useState(0);
   const [currentTab, setCurrentTab] = useState("courses");
+  
+  // 1. Grab dimensions dynamically
   const { width, height } = useWindowDimensions();
+  
+  // 2. Calculate widths INSIDE the component so they are always 100% accurate
+  const ITEM_WIDTH = width * 0.75;
+  const ITEM_SPACING = (width - ITEM_WIDTH) / 2;
+
   const { data: coursesResponse, refetch: refetchCourses } = useCourses({ retry: false });
   const { data: profileData } = useMyProfile({ retry: false });
   const [refreshing, setRefreshing] = useState(false);
@@ -96,6 +97,7 @@ export default function CoursesScreen() {
     }
   };
 
+  // 3. Render item now has access to the dynamic ITEM_WIDTH
   const renderItem = ({ item, index }) => {
     const inputRange = [
       (index - 1) * ITEM_WIDTH,
@@ -160,7 +162,7 @@ export default function CoursesScreen() {
       </View>
 
       <View style={styles.contentBody}>
-        <View style={styles.carouselContainer}>
+        <View style={[styles.carouselContainer, { height: height * 0.45 }]}>
           <Animated.FlatList
             data={coursesToRender}
             keyExtractor={(item) => item.id}
@@ -222,7 +224,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   locationText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "Abel",
     color: "#333",
     marginLeft: 5,
@@ -230,11 +232,11 @@ const styles = StyleSheet.create({
 
   contentBody: {
     flex: 1,
-    paddingBottom: 110,
+    justifyContent: "center", 
+    paddingBottom: 90, 
   },
   carouselContainer: {
-    height: SCREEN_HEIGHT * 0.45,
-    marginTop: 25,
+    marginTop: 10,
   },
   cardContainer: {
     width: "100%",
@@ -253,12 +255,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: "100%",
     padding: 20,
-    paddingTop: 60,
+    paddingTop: 30,
     backgroundColor: "rgba(0,0,0,0.4)",
   },
   cardTitle: {
     color: "#FFF",
-    fontSize: 26,
+    fontSize: 28,
     fontFamily: "Bebas",
     marginBottom: 5,
     textShadowColor: "rgba(0,0,0,0.5)",
@@ -267,7 +269,7 @@ const styles = StyleSheet.create({
   },
   cardDescription: {
     color: "#FFF",
-    fontSize: 15,
+    fontSize: 18,
     fontFamily: "Abel",
     lineHeight: 20,
   },
@@ -280,7 +282,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginHorizontal: 40,
     borderRadius: 30,
-    marginTop: 30,
+    marginTop: 40,
   },
   flagIcon: {
     marginRight: 10,

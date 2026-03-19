@@ -22,6 +22,7 @@ import { useMyProfile } from "../hooks/useAuth";
 export default function CoachesScreen({ navigation }) {
   const [currentTab, setCurrentTab] = useState("coach");
   const [searchQuery, setSearchQuery] = useState("");
+  // Destructure height here as well
   const { width, height } = useWindowDimensions();
   const { data: coachesResponse, refetch: refetchCoaches } = useCoaches({ retry: false });
   const { data: profileData } = useMyProfile({ retry: false });
@@ -107,10 +108,12 @@ export default function CoachesScreen({ navigation }) {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#333" />
         }
       >
+        {/* Pass height down here */}
         <CoachSection
           title="TOP RATED"
           coaches={topRated}
           width={width}
+          height={height}
           onPress={handleCoachPress}
         />
 
@@ -118,6 +121,7 @@ export default function CoachesScreen({ navigation }) {
           title="AVAILABLE NOW"
           coaches={available}
           width={width}
+          height={height}
           onPress={handleCoachPress}
         />
       </ScrollView>
@@ -131,7 +135,8 @@ export default function CoachesScreen({ navigation }) {
   );
 }
 
-const CoachSection = ({ title, coaches, width, onPress }) => (
+// Receive height in props
+const CoachSection = ({ title, coaches, width, height, onPress }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -148,6 +153,7 @@ const CoachSection = ({ title, coaches, width, onPress }) => (
           key={coach.id}
           coach={coach}
           width={width}
+          height={height} // Pass height down to the card
           isFirst={index === 0}
           onPress={() => onPress(coach)}
         />
@@ -156,7 +162,8 @@ const CoachSection = ({ title, coaches, width, onPress }) => (
   </View>
 );
 
-const CoachCard = ({ coach, width, isFirst, onPress }) => {
+// Receive height in props and apply it to the card styles
+const CoachCard = ({ coach, width, height, isFirst, onPress }) => {
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -165,6 +172,7 @@ const CoachCard = ({ coach, width, isFirst, onPress }) => {
         styles.card,
         {
           width: width * 0.40,
+          height: height * 0.23, 
           marginLeft: isFirst ? 0 : 10,
         },
       ]}
@@ -243,7 +251,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   card: {
-    height: 190,
     borderRadius: 30,
     overflow: "hidden",
   },
@@ -274,13 +281,13 @@ const styles = StyleSheet.create({
   },
   name: {
     color: "#fff",
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: "Bebas",
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   exp: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "Abel",
   },
 });

@@ -8,6 +8,7 @@ import {
   ScrollView,
   RefreshControl,
   Dimensions,
+  Image,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Feather, Ionicons } from "@expo/vector-icons";
@@ -83,7 +84,10 @@ export default function ReservationScreen({ route }) {
             style={styles.backBtn}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="return-up-back-outline" size={32} color="#000" />
+             <Image 
+              source={require('../assets/icons/Back.png')} 
+              style={{ width: 32, height: 32, tintColor: '#000' }} 
+            />
           </TouchableOpacity>
 
           {/* HEADER CONTENT OVER IMAGE */}
@@ -188,7 +192,7 @@ const styles = StyleSheet.create({
 
   backgroundImage: {
     width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
+    height: SCREEN_HEIGHT * 0.6,
   },
 
   backBtn: {
@@ -228,6 +232,7 @@ const styles = StyleSheet.create({
     bottom: BOTTOM_SHEET_HEIGHT + 30, 
     left: 20,
     right: 20,
+    bottom:50
   },
 
   bottomSheet: {
@@ -235,7 +240,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: SCREEN_WIDTH,
     height: BOTTOM_SHEET_HEIGHT, 
-    backgroundColor: "rgba(42, 46, 42, 0.82)",
+    backgroundColor: "rgb(42, 46, 42)",
     borderTopLeftRadius: 35,
     borderTopRightRadius: 35,
     borderWidth: 1,
@@ -277,7 +282,7 @@ const styles = StyleSheet.create({
     borderRadius: 37.5,
     borderWidth: 1,
     borderColor: COLORS.white,
-    marginRight: 15,
+    marginRight: 10,
     alignItems: "center",
     justifyContent: "center",
   },

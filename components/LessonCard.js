@@ -58,14 +58,14 @@ const styles = StyleSheet.create({
   lessonTitle: {
     color: "#FFF",
     fontFamily: "Bebas",
-    fontSize: 18,
+    fontSize: 20,
     marginBottom: 5,
     letterSpacing: 0.5,
   },
   lessonDesc: {
     color: "#AAA",
     fontFamily: "Abel",
-    fontSize: 14,
+    fontSize: 16,
     marginBottom: 15,
     lineHeight: 20,
   },
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   detailText: {
     color: "#FFF",
     fontFamily: "Abel",
-    fontSize: 14,
+    fontSize: 16,
     marginLeft: 5,
   },
   bottomRow: {
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   bookBtnText: {
     color: "#FFF",
     fontFamily: "Bebas",
-    fontSize: 16,
+    fontSize: 18,
     letterSpacing: 0.5,
   },
 });

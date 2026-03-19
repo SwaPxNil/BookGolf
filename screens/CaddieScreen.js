@@ -22,6 +22,7 @@ import { useMyProfile } from "../hooks/useAuth";
 export default function CaddieScreen({ navigation }) {
   const [currentTab, setCurrentTab] = useState("caddie");
   const [searchQuery, setSearchQuery] = useState("");
+  // We grab both width and height here
   const { width, height } = useWindowDimensions();
   const { data: caddiesResponse, refetch: refetchCaddies } = useCaddies({ retry: false });
   const { data: profileData } = useMyProfile({ retry: false });
@@ -109,17 +110,21 @@ export default function CaddieScreen({ navigation }) {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#333" />
         }
       >
+        {/* Passing height down to the section */}
         <CaddieSection
           title="TOP RATED"
           caddies={topRated}
           width={width}
+          height={height}
           onPress={handleCaddiePress}
         />
 
+        {/* Passing height down to the section */}
         <CaddieSection
           title="AVAILABLE NOW"
           caddies={available}
           width={width}
+          height={height}
           onPress={handleCaddiePress}
         />
       </ScrollView>
@@ -133,7 +138,8 @@ export default function CaddieScreen({ navigation }) {
   );
 }
 
-const CaddieSection = ({ title, caddies, width, onPress }) => (
+// Receive height in props here
+const CaddieSection = ({ title, caddies, width, height, onPress }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -150,6 +156,7 @@ const CaddieSection = ({ title, caddies, width, onPress }) => (
           key={caddie.id}
           caddie={caddie}
           width={width}
+          height={height} // Pass height down to the card
           isFirst={index === 0}
           onPress={() => onPress(caddie)}
         />
@@ -158,7 +165,7 @@ const CaddieSection = ({ title, caddies, width, onPress }) => (
   </View>
 );
 
-const CaddieCard = ({ caddie, width, isFirst, onPress }) => {
+const CaddieCard = ({ caddie, width, height, isFirst, onPress }) => {
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -167,6 +174,7 @@ const CaddieCard = ({ caddie, width, isFirst, onPress }) => {
         styles.card,
         {
           width: width * 0.4,
+          height: height * 0.23,
           marginLeft: isFirst ? 0 : 10,
         },
       ]}
@@ -245,7 +253,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   card: {
-    height: 190,
     borderRadius: 30,
     overflow: "hidden",
   },
@@ -276,13 +283,13 @@ const styles = StyleSheet.create({
   },
   name: {
     color: "#fff",
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: "Bebas",
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   exp: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "Abel",
   },
 });
