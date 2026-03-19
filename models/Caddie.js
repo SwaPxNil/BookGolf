@@ -19,18 +19,11 @@ const CaddieSchema = new mongoose.Schema({
     type: Number,
     min: [0, 'Experience cannot be negative'],
   },
-  experience_years: {
-    type: Number,
-    min: [0, 'Experience years cannot be negative'],
-  },
   availability_slots: {
     type: [Date],
     default: [],
   },
   profile_img: {
-    type: String,
-  },
-  image_url: {
     type: String,
   },
   rating: {
@@ -44,6 +37,9 @@ const CaddieSchema = new mongoose.Schema({
     min: [0, 'Matches caddied cannot be negative'],
     default: 0,
   },
+  speciality:{
+    type:String
+  }
 });
 
 CaddieSchema.pre('validate', function(next) {
