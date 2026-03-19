@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const { hashPassword, comparePassword, generateToken, verifyToken } = require('../utils/auth');
 const { generateSecret, verifyToken: verify2FAToken, sendTwoFactorEmail } = require('../utils/twoFactorAuth');
+const { uploadImageBuffer } = require('../utils/cloudinaryUpload');
 const { v4: uuidv4 } = require('uuid');
 
 // @desc    Register user
@@ -152,6 +153,50 @@ exports.verify2FA = async (req, res, next) => {
     }
 };
 
+  // @desc    Resend 2FA code
+  // @route   POST /api/auth/resend-2fa
+  // @access  Public
+  exports.resend2FA = async (req, res, next) => {
+    const { temp_token } = req.body;
+
+    if (!temp_token) {
+      return res.status(400).json({ success: false, msg: 'Please provide temp_token' });
+    }
+
+    try {
+      const decoded = verifyToken(temp_token, process.env.JWT_SECRET);
+      if (!decoded || decoded.type !== 'TEMP') {
+        return res.status(401).json({ success: false, msg: 'Invalid or expired temp token' });
+      }
+
+      const user = await User.findById(decoded.id).select('+two_factor_secret +two_factor_code +two_factor_code_expires');
+      if (!user) {
+        return res.status(404).json({ success: false, msg: 'User not found' });
+      }
+
+      const token = Math.floor(100000 + Math.random() * 900000).toString();
+      user.two_factor_code = token;
+      user.two_factor_code_expires = Date.now() + 10 * 60 * 1000;
+      await user.save();
+
+      try {
+        await sendTwoFactorEmail(user.email, token);
+      } catch (emailError) {
+        console.error('2FA email failed:', emailError.message);
+      }
+
+      const renewedTempToken = generateToken({ id: user._id, type: 'TEMP' }, process.env.JWT_SECRET, '10m');
+
+      res.status(200).json({
+        success: true,
+        msg: 'A new 2FA code has been sent.',
+        temp_token: renewedTempToken,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
 // @desc    Refresh token
 // @route   POST /api/auth/refresh
 // @access  Public
@@ -197,6 +242,77 @@ exports.getUserProfile = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: user,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Update current logged in user profile
+// @route   PUT /api/auth/me
+// @access  Private
+exports.updateUserProfile = async (req, res, next) => {
+  try {
+    const { full_name, email, profile_img, current_password, new_password } = req.body;
+    const hasAnyField = [full_name, email, profile_img, current_password, new_password].some(
+      (value) => typeof value === 'string' && value.trim() !== ''
+    );
+
+    if (!hasAnyField && !req.file) {
+      return res.status(400).json({ success: false, msg: 'Please provide profile updates' });
+    }
+
+    const user = await User.findById(req.user.id).select('+password_hash');
+    if (!user) {
+      return res.status(404).json({ success: false, msg: 'User not found' });
+    }
+
+    if (typeof full_name === 'string') {
+      user.full_name = full_name.trim();
+    }
+
+    if (typeof email === 'string') {
+      const normalizedEmail = email.trim().toLowerCase();
+      if (normalizedEmail !== user.email) {
+        const existing = await User.findOne({ email: normalizedEmail, _id: { $ne: user._id } });
+        if (existing) {
+          return res.status(400).json({ success: false, msg: 'Email is already in use' });
+        }
+      }
+      user.email = normalizedEmail;
+    }
+
+    if (typeof profile_img === 'string') {
+      user.profile_img = profile_img.trim();
+    }
+
+    if (req.file) {
+      const uploadResult = await uploadImageBuffer(req.file, 'users');
+      if (uploadResult?.url) {
+        user.profile_img = uploadResult.url;
+      }
+    }
+
+    if (new_password) {
+      if (!current_password) {
+        return res.status(400).json({ success: false, msg: 'Current password is required to set a new password' });
+      }
+
+      const isMatch = await comparePassword(current_password, user.password_hash);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, msg: 'Current password is incorrect' });
+      }
+
+      user.password_hash = await hashPassword(new_password);
+    }
+
+    await user.save();
+
+    const safeUser = await User.findById(user._id).select('-password_hash -two_factor_secret -two_factor_code');
+    res.status(200).json({
+      success: true,
+      msg: 'Profile updated successfully',
+      data: safeUser,
     });
   } catch (err) {
     next(err);

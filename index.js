@@ -41,6 +41,7 @@ app.use('/api/caddies', caddieBookingRouter);
 app.use('/api/bookings', require('./routes/booking'));
 app.use('/api/payments', require('./routes/payment'));
 app.use('/api/rounds', require('./routes/round'));
+app.use('/api/round', require('./routes/round'));
 app.use('/api/handicap', require('./routes/handicap'));
 app.use('/api/admin-logs', require('./routes/adminLog'));
 app.use('/api/super-admin', require('./routes/superAdmin'));

@@ -17,8 +17,20 @@ const verify2FASchema = Joi.object({
     two_factor_code: Joi.string().length(6).required(),
 });
 
+const resend2FASchema = Joi.object({
+  temp_token: Joi.string().required(),
+});
+
 const refreshTokenSchema = Joi.object({
     refresh_token: Joi.string().required(),
+});
+
+const updateProfileSchema = Joi.object({
+  full_name: Joi.string().min(3).max(50).optional(),
+  email: Joi.string().email().optional(),
+  profile_img: Joi.string().allow('').optional(),
+  current_password: Joi.string().min(6).optional(),
+  new_password: Joi.string().min(6).optional(),
 });
 
 
@@ -26,5 +38,7 @@ module.exports = {
   registerSchema,
   loginSchema,
   verify2FASchema,
-  refreshTokenSchema
+  resend2FASchema,
+  refreshTokenSchema,
+  updateProfileSchema,
 };
