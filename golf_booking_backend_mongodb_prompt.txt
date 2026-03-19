@@ -1,0 +1,214 @@
+You are a senior backend engineer.
+
+Generate a COMPLETE production-ready backend for a Golf Booking & Management System using:
+
+- Node.js (latest LTS)
+- Express.js
+- MongoDB Atlas (Mongoose ODM)
+- JWT authentication
+- Role-based access control
+- REST APIs only (no GraphQL)
+- Clean MVC + service architecture
+- Environment variables
+- Proper validation and error handling
+
+----------------------------------
+SYSTEM USERS (ROLES)
+----------------------------------
+1. USER
+2. COURSE_ADMIN
+3. SUPER_ADMIN
+
+----------------------------------
+DATABASE (MongoDB – Mongoose)
+----------------------------------
+Use UUIDs for all IDs.
+
+Collections (based on attached ER/Class diagram):
+
+- User
+  - user_id
+  - full_name
+  - email (unique)
+  - password_hash
+  - role (USER | COURSE_ADMIN | SUPER_ADMIN)
+  - is_2fa_verified
+  - created_at
+
+- Course
+  - course_id
+  - name
+  - location
+  - status (PENDING | APPROVED | REJECTED)
+  - slope_rating (number)
+  - course_rating (number)
+  - created_by (course_admin_id)
+
+- TeeTime
+  - tee_time_id
+  - course_id
+  - slot_time (datetime)
+  - price
+  - status (AVAILABLE | BOOKED)
+
+- Coach
+  - coach_id
+  - specialization
+  - experience_years
+  - lessons [
+      {
+        lesson_id,
+        title,
+        duration_minutes,
+        price
+      }
+    ]
+
+- Caddie
+  - caddie_id
+  - experience_years
+  - availability_slots [datetime]
+
+- Booking
+  - booking_id
+  - user_id
+  - booking_type (TEE_TIME | COACH | CADDIE)
+  - course_id
+  - tee_time_id (nullable)
+  - coach_id (nullable)
+  - lesson_id (nullable)
+  - caddie_id (nullable)
+  - status (CONFIRMED | CANCELLED)
+  - created_at
+
+- Payment
+  - payment_id
+  - booking_id
+  - amount
+  - status (PENDING | PAID | FAILED)
+
+- Round
+  - round_id
+  - user_id
+  - course_id
+  - round_date
+  - total_score
+
+- Handicap
+  - handicap_id
+  - user_id
+  - course_id
+  - handicap_value
+  - calculated_at
+
+- AdminLog
+  - log_id
+  - actor_id
+  - action
+  - metadata
+  - created_at
+
+----------------------------------
+AUTHENTICATION & SECURITY
+----------------------------------
+- Email + password signup
+- Password hashing (bcrypt)
+- Login returns temp_token
+- 2FA code sent via email (mock email service)
+- Verify 2FA to receive:
+  - access_token (JWT)
+  - refresh_token
+- /auth/refresh endpoint
+- Middleware:
+  - authenticate
+  - authorize(role)
+
+----------------------------------
+FEATURE REQUIREMENTS
+----------------------------------
+
+1. TEE TIME BOOKING
+- GET /courses
+- GET /courses/:id/tee-times (only AVAILABLE)
+- POST /tee-times/book
+- Prevent double booking (atomic operation)
+
+2. COACH & LESSONS
+- GET /coaches
+- GET /coaches/:id/lessons
+- POST /coach-lessons/book
+- DELETE /coach-lessons/:booking_id (cancel)
+
+3. CADDIE BOOKING
+- GET /caddies
+- GET /caddies/:id/availability
+- POST /caddies/book
+- DELETE /caddies/:booking_id
+
+4. GAME HISTORY
+- GET /users/me/rounds
+- GET /rounds/:id (final score details)
+
+5. HANDICAP CALCULATION
+- POST /handicap/calculate
+  Body:
+  {
+    recent_score_1,
+    recent_score_2,
+    course_id
+  }
+
+Calculation logic:
+- Use course_rating and slope_rating
+- Use average of last 2 scores
+- Return:
+  {
+    course_name,
+    handicap_value
+  }
+
+6. COURSE ADMIN
+(Only COURSE_ADMIN role)
+- GET /admin/coaches
+- POST /admin/coaches
+- PUT /admin/coaches/:id
+- DELETE /admin/coaches/:id
+- Same CRUD for Caddies
+- View lessons
+
+7. SUPER ADMIN
+(Only SUPER_ADMIN role)
+- GET /super-admin/course-admins
+- Approve / reject courses
+- GET /super-admin/logs
+
+----------------------------------
+ARCHITECTURE RULES
+----------------------------------
+- Separate folders:
+  /controllers
+  /services
+  /models
+  /routes
+  /middlewares
+  /utils
+- Central error handler
+- Input validation (Joi or Zod)
+- MongoDB transactions where required
+- Seed script for test data
+
+----------------------------------
+DELIVERABLES
+----------------------------------
+1. Full folder structure
+2. All Mongoose schemas
+3. All API routes
+4. Controllers & services
+5. Auth & role middleware
+6. Handicap calculation logic
+7. README.md with setup instructions
+8. Example .env file
+9. Postman API collection
+
+Generate clean, commented, production-ready code.
+Do NOT skip any feature.
