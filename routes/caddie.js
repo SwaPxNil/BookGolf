@@ -20,11 +20,11 @@ router
   .get(getCaddies)
   .post(
     authenticate,
-    authorize('COURSE_ADMIN'),
-    uploadSingleImage('image'),
-    parseJsonFields(['availability_slots']),
-    validate(createCaddieSchema),
-    createCaddie
+  authorize('COURSE_ADMIN'),
+  uploadSingleImage('image'),
+  parseJsonFields(['availability_slots']), // <-- I strongly suspect this one!
+  validate(createCaddieSchema),
+  createCaddie
   );
 
 router

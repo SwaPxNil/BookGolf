@@ -19,11 +19,18 @@ const CaddieSchema = new mongoose.Schema({
     type: Number,
     min: [0, 'Experience cannot be negative'],
   },
+  experience_years: { // <-- ADDED THIS BACK
+    type: Number,
+    min: [0, 'Experience years cannot be negative'],
+  },
   availability_slots: {
     type: [Date],
     default: [],
   },
   profile_img: {
+    type: String,
+  },
+  image_url: { 
     type: String,
   },
   rating: {
@@ -37,8 +44,8 @@ const CaddieSchema = new mongoose.Schema({
     min: [0, 'Matches caddied cannot be negative'],
     default: 0,
   },
-  speciality:{
-    type:String
+  speciality: {
+    type: String,
   }
 });
 
@@ -52,10 +59,8 @@ CaddieSchema.pre('validate', function(next) {
   }
 
   if (typeof this.experience !== 'number' && typeof this.experience_years !== 'number') {
-    return next(new Error('Please add caddie experience'));
+    throw new Error('Please add caddie experience');
   }
-
-  next();
 });
 
 module.exports = mongoose.model('Caddie', CaddieSchema);

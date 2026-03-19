@@ -91,7 +91,6 @@ CoachSchema.statics.calculateRecommendationValue = calculateRecommendationValue;
 
 CoachSchema.pre('save', function(next) {
   this.recommendation_value = calculateRecommendationValue(this.rating, this.students_taught);
-  next();
 });
 
 module.exports = mongoose.model('Coach', CoachSchema);

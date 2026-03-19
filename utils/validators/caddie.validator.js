@@ -10,6 +10,7 @@ const createCaddieSchema = Joi.object({
   image_url: Joi.string().uri().optional(),
   rating: Joi.number().min(0).max(5).optional(),
   matches_caddied: Joi.number().integer().min(0).optional(),
+  speciality: Joi.string().optional(), // <-- ADDED THIS
 }).or('experience', 'experience_years');
 
 const updateCaddieSchema = Joi.object({
@@ -22,6 +23,7 @@ const updateCaddieSchema = Joi.object({
   image_url: Joi.string().uri().optional(),
   rating: Joi.number().min(0).max(5).optional(),
   matches_caddied: Joi.number().integer().min(0).optional(),
+  speciality: Joi.string().optional(), // <-- ADDED THIS
 });
 
 module.exports = {
