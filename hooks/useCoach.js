@@ -96,14 +96,21 @@ export const useBookCoachLesson = (options = {}) => {
     mutationFn: bookCoachLesson,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["coaches"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
     },
     ...options,
   });
 };
 
 export const useCancelCoachLessonBooking = (options = {}) => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: cancelCoachLessonBooking,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["coaches"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
+    },
     ...options,
   });
 };

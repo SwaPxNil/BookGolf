@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,11 +8,13 @@ import {
   ScrollView,
   Dimensions,
   Animated,
+  RefreshControl,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { useCoachAvailability } from "../hooks/useCoach";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -22,11 +24,27 @@ const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.6;
 export default function LessonBookingScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const coachId = route?.params?.coachId || route?.params?.coach?.id || route?.params?.coach?._id;
+  const {
+    data: availabilityResponse,
+    isLoading: availabilityLoading,
+    refetch: refetchAvailability,
+  } = useCoachAvailability(coachId, { retry: false });
   
   const coach = route?.params?.coach || {
     name: "RAMESH KARKI",
     image: require("../assets/images/coach2.png"), 
   };
+
+  const coachImageSource = coach?.imageUrl
+    ? { uri: coach.imageUrl }
+    : coach?.image_url
+    ? { uri: coach.image_url }
+    : coach?.profile_img
+    ? { uri: coach.profile_img }
+    : coach?.image
+    ? coach.image
+    : require("../assets/images/coach2.png");
   
   const lesson = route?.params?.lesson || {
     title: "FULL SWING ANALYSIS",
@@ -39,6 +57,7 @@ export default function LessonBookingScreen() {
   const [step, setStep] = useState(1); 
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   const animState = useRef(new Animated.Value(0)).current;
 
@@ -78,22 +97,60 @@ export default function LessonBookingScreen() {
   
   const headerTranslateY = animState.interpolate({ inputRange: [0, 1, 2], outputRange: [85, 85, 0] });
 
-  // ----- DUMMY CALENDAR DATA -----
-  const dates = [
-    { day: "16", label: "Mon", value: "2026-03-16" },
-    { day: "17", label: "Tue", value: "2026-03-17" },
-    { day: "18", label: "Wed", value: "2026-03-18" },
-    { day: "19", label: "Thu", value: "2026-03-19" },
-    { day: "20", label: "Fri", value: "2026-03-20" },
-  ];
-  const timeSlots = [
-    { id: 1, slotText: "12:30 - 13:30" },
-    { id: 2, slotText: "13:30 - 14:30" },
-    { id: 3, slotText: "14:30 - 15:30" },
-    { id: 4, slotText: "15:30 - 16:30" },
-  ];
+  const availabilitySlots = Array.isArray(availabilityResponse?.data?.data)
+    ? availabilityResponse.data.data
+    : Array.isArray(coach?.availability_slots)
+    ? coach.availability_slots
+    : [];
+
+  const formatDateLabel = (isoValue) => {
+    const dt = new Date(isoValue);
+    return {
+      day: String(dt.getDate()).padStart(2, "0"),
+      label: dt.toLocaleDateString("en-US", { weekday: "short" }),
+      value: dt.toISOString().slice(0, 10),
+    };
+  };
+
+  const formatTime = (isoValue) => {
+    const dt = new Date(isoValue);
+    return dt.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  };
+
+  const dates = useMemo(() => {
+    const uniqueDateMap = new Map();
+
+    availabilitySlots.forEach((slot) => {
+      const formatted = formatDateLabel(slot);
+      if (!uniqueDateMap.has(formatted.value)) {
+        uniqueDateMap.set(formatted.value, formatted);
+      }
+    });
+
+    return Array.from(uniqueDateMap.values());
+  }, [availabilitySlots]);
 
   const activeDateValue = selectedDate || dates[0]?.value || "";
+  const timeSlots = useMemo(() => {
+    return availabilitySlots
+      .filter((slot) => slot?.slice(0, 10) === activeDateValue)
+      .map((slot) => ({ id: slot, value: slot, slotText: formatTime(slot) }));
+  }, [availabilitySlots, activeDateValue]);
+
+  const isLoadingBookingData = Boolean(coachId) && availabilityLoading;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchAvailability();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -101,7 +158,7 @@ export default function LessonBookingScreen() {
 
       {/* BACKGROUND IMAGE */}
       <ImageBackground 
-        source={coach.image} 
+        source={coachImageSource} 
         style={styles.backgroundImage} 
         resizeMode="cover"
       >
@@ -137,30 +194,37 @@ export default function LessonBookingScreen() {
       <Animated.View pointerEvents={step === 1 ? 'auto' : 'none'} style={[styles.cardContainer, { opacity: bigCardOpacity, transform: [{ translateY: bigCardTranslateY }] }]}>
         
         {/* Scrollable Area */}
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
-          <View style={styles.step1Content}>
-            <Text style={styles.sectionHeaderSmall}>LESSON DETAILS</Text>
-            <Text style={styles.bigCardTitle}>{lesson.title.toUpperCase()}</Text>
-            <Text style={styles.bigCardDesc}>{lesson.fullDescription}</Text>
-            
-            <View style={styles.infoTable}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>LESSON PERIOD</Text>
-                <View style={styles.infoValueContainer}>
-                  <Ionicons name="time-outline" size={18} color="#FFF" />
-                  <Text style={styles.infoValue}>{lesson.time}</Text>
-                </View>
-              </View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.scrollArea}
+        >
+          {isLoadingBookingData ? (
+            <BookingSkeleton />
+          ) : (
+            <View style={styles.step1Content}>
+              <Text style={styles.sectionHeaderSmall}>LESSON DETAILS</Text>
+              <Text style={styles.bigCardTitle}>{lesson.title.toUpperCase()}</Text>
+              <Text style={styles.bigCardDesc}>{lesson.fullDescription}</Text>
               
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>DIFFICULTY</Text>
-                <View style={styles.infoValueContainer}>
-                  <Ionicons name="stats-chart" size={18} color="#FAFF5D" />
-                  <Text style={[styles.infoValue, { color: "#FAFF5D" }]}>{lesson.level}</Text>
+              <View style={styles.infoTable}>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>LESSON PERIOD</Text>
+                  <View style={styles.infoValueContainer}>
+                    <Ionicons name="time-outline" size={18} color="#FFF" />
+                    <Text style={styles.infoValue}>{lesson.time}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>DIFFICULTY</Text>
+                  <View style={styles.infoValueContainer}>
+                    <Ionicons name="stats-chart" size={18} color="#FAFF5D" />
+                    <Text style={[styles.infoValue, { color: "#FAFF5D" }]}>{lesson.level}</Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
+          )}
         </ScrollView>
         
         <View style={styles.nextBtnContainer}>
@@ -173,7 +237,13 @@ export default function LessonBookingScreen() {
 
       <Animated.View pointerEvents={step === 2 ? 'auto' : 'none'} style={[styles.cardContainer, { transform: [{ translateY: bottomSheetTranslateY }] }]}>
         
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.scrollArea}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#FFFFFF" />
+          }
+        >
           
           {/* DATE SELECTION */}
           <View style={styles.sheetHeader}>
@@ -192,6 +262,9 @@ export default function LessonBookingScreen() {
               )
             })}
           </ScrollView>
+          {!isLoadingBookingData && dates.length === 0 ? (
+            <Text style={styles.emptyText}>No available reservation dates for this coach.</Text>
+          ) : null}
 
           {/* TIME SELECTION */}
           <View style={[styles.sheetHeader, { marginTop: 10 }]}>
@@ -201,14 +274,17 @@ export default function LessonBookingScreen() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
             {timeSlots.map((slot) => {
-              const isActive = selectedSlot === slot.slotText;
+              const isActive = selectedSlot === slot.value;
               return (
-                <TouchableOpacity key={slot.id} style={[styles.timeSlot, isActive && styles.timeSlotActive]} onPress={() => setSelectedSlot(slot.slotText)}>
+                <TouchableOpacity key={slot.id} style={[styles.timeSlot, isActive && styles.timeSlotActive]} onPress={() => setSelectedSlot(slot.value)}>
                   <Text style={[styles.timeText, isActive && styles.timeTextActive]}>{slot.slotText}</Text>
                 </TouchableOpacity>
               )
             })}
           </ScrollView>
+          {!isLoadingBookingData && dates.length > 0 && timeSlots.length === 0 ? (
+            <Text style={styles.emptyText}>No available time slots on the selected date.</Text>
+          ) : null}
         </ScrollView>
 
         {/* Fixed Footer (Step 2) */}
@@ -226,6 +302,17 @@ export default function LessonBookingScreen() {
     </View>
   );
 }
+
+const BookingSkeleton = () => (
+  <View style={styles.step1Content}>
+    <View style={styles.skeletonHeader} />
+    <View style={styles.skeletonTitle} />
+    <View style={styles.skeletonParagraph} />
+    <View style={styles.skeletonParagraph} />
+    <View style={styles.skeletonRow} />
+    <View style={styles.skeletonRow} />
+  </View>
+);
 
 const COLORS = { 
   dark: "#2A2E2A", 
@@ -266,9 +353,12 @@ const styles = StyleSheet.create({
     bottom: 0, 
     width: SCREEN_WIDTH, 
     height: BOTTOM_SHEET_HEIGHT, 
-    backgroundColor: COLORS.dark, 
+    backgroundColor: "rgba(42, 46, 42, 0.82)", 
     borderTopLeftRadius: 35,  
     borderTopRightRadius: 35, 
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
+    overflow: "hidden",
     paddingTop: 30, 
     paddingBottom: 25, 
     zIndex: 20,
@@ -488,6 +578,46 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontFamily: "Abel",
     fontSize: 18,
+  },
+
+  emptyText: {
+    color: COLORS.lightGray,
+    fontFamily: "Abel",
+    fontSize: 14,
+    paddingHorizontal: 25,
+    marginTop: 4,
+  },
+
+  skeletonHeader: {
+    width: 140,
+    height: 20,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    marginBottom: 14,
+  },
+
+  skeletonTitle: {
+    width: "82%",
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    marginBottom: 10,
+  },
+
+  skeletonParagraph: {
+    width: "100%",
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    marginBottom: 8,
+  },
+
+  skeletonRow: {
+    width: "92%",
+    height: 18,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    marginTop: 12,
   },
 
   footerRow: {

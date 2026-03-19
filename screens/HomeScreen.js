@@ -7,6 +7,8 @@ import {
   Animated,
   TouchableOpacity,
   Image,
+  ScrollView,
+  RefreshControl,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,9 +26,14 @@ export default function HomeScreen() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [currentTab, setCurrentTab] = useState("home");
   const [period, setPeriod] = useState(getTimePeriod());
-  const { data: dashboardData, isLoading: dashboardLoading } = useDashboard({ retry: false });
-  const { data: profileData } = useMyProfile({ retry: false });
-  const { data: roundsData } = useMyRounds({ retry: false });
+  const [refreshing, setRefreshing] = useState(false);
+  const {
+    data: dashboardData,
+    isLoading: dashboardLoading,
+    refetch: refetchDashboard,
+  } = useDashboard({ retry: false });
+  const { data: profileData, refetch: refetchProfile } = useMyProfile({ retry: false });
+  const { data: roundsData, refetch: refetchRounds } = useMyRounds({ retry: false });
 
   function getTimePeriod() {
     const hour = new Date().getHours();
@@ -61,6 +68,9 @@ export default function HomeScreen() {
 
   const dashboard = dashboardData?.data?.data ?? dashboardData?.data ?? null;
   const profile = profileData?.data?.data ?? profileData?.data ?? {};
+  const avatarSource = profile?.profile_img
+    ? { uri: profile.profile_img }
+    : require("../assets/images/Avatar.png");
   const rounds = Array.isArray(roundsData?.data?.data)
     ? roundsData.data.data
     : Array.isArray(roundsData?.data)
@@ -80,6 +90,15 @@ export default function HomeScreen() {
     night: { text: `GOOD NIGHT,\n${userName.toUpperCase()}!`, sub: "Unwind with a quick lesson" },
   }[period];
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refetchDashboard(), refetchProfile(), refetchRounds()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, { paddingHorizontal: width * 0.06 }]}>
       <StatusBar style="dark" />
@@ -92,7 +111,7 @@ export default function HomeScreen() {
         onPress={() => navigation.navigate("profile")}
       >
         <Image
-          source={require("../assets/images/Avatar.png")}
+          source={avatarSource}
           style={styles.profileImage}
         />
       </TouchableOpacity>
@@ -107,35 +126,43 @@ export default function HomeScreen() {
         <Ionicons name="search" size={22} color="#000" />
       </TouchableOpacity>
 
-      <Animated.View style={{ opacity: fadeAnim }}>
-        <Text style={[styles.title, { fontSize: width * 0.12, marginTop: height * 0.1 }]}>
-          {ui.text}
-        </Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: height * 0.2 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#333" />
+        }
+      >
+        <Animated.View style={{ opacity: fadeAnim }}>
+          <Text style={[styles.title, { fontSize: width * 0.12, marginTop: height * 0.1 }]}>
+            {ui.text}
+          </Text>
 
-        <Text style={[styles.subtitle, { fontSize: width * 0.04 }]}>
-          {dashboardLoading ? "Loading dashboard..." : dashboardSubtitle || ui.sub}
-        </Text>
+          <Text style={[styles.subtitle, { fontSize: width * 0.04 }]}>
+            {dashboardLoading ? "Loading dashboard..." : dashboardSubtitle || ui.sub}
+          </Text>
 
-        <Text style={[styles.sectionTitle, { fontSize: width * 0.06, marginTop: height * 0.05 }]}>
-          RECENT LESSONS
-        </Text>
+          <Text style={[styles.sectionTitle, { fontSize: width * 0.06, marginTop: height * 0.05 }]}>
+            RECENT LESSONS
+          </Text>
 
-        <View style={[styles.lessonCard, { borderRadius: width * 0.07 }]}>
-          {recentRounds.map((round, index) => (
-            <View key={`${round?.id ?? round?._id ?? index}`} style={styles.lessonRow}>
-              <Text style={styles.lessonText}>{round?.date || round?.played_at || "Round"}</Text>
-              <Text style={styles.lessonScore}>{round?.score ?? round?.total_score ?? "-"}</Text>
-            </View>
-          ))}
-          {recentRounds.length === 0 ? (
-            <Text style={styles.lessonEmpty}>No recent rounds found.</Text>
-          ) : null}
-        </View>
+          <View style={[styles.lessonCard, { borderRadius: width * 0.07 }]}>
+            {recentRounds.map((round, index) => (
+              <View key={`${round?.id ?? round?._id ?? index}`} style={styles.lessonRow}>
+                <Text style={styles.lessonText}>{round?.date || round?.played_at || "Round"}</Text>
+                <Text style={styles.lessonScore}>{round?.score ?? round?.total_score ?? "-"}</Text>
+              </View>
+            ))}
+            {recentRounds.length === 0 ? (
+              <Text style={styles.lessonEmpty}>No recent rounds found.</Text>
+            ) : null}
+          </View>
 
-        <Text style={[styles.sectionTitle, { fontSize: width * 0.06, marginTop: height * 0.05 }]}>
-          COURSE LAYOUT
-        </Text>
-      </Animated.View>
+          <Text style={[styles.sectionTitle, { fontSize: width * 0.06, marginTop: height * 0.05 }]}>
+            COURSE LAYOUT
+          </Text>
+        </Animated.View>
+      </ScrollView>
 
       <Navbar
         currentTab={currentTab}

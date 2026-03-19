@@ -22,9 +22,14 @@ export const useCreateTeeTime = (options = {}) => {
   return useMutation({
     mutationFn: createTeeTime,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["teeTimes", variables.course_id],
-      });
+      const courseId = variables?.course_id ?? variables?.courseId;
+      if (courseId) {
+        queryClient.invalidateQueries({
+          queryKey: ["teeTimes", courseId],
+        });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["teeTimes"] });
+      }
     },
     ...options,
   });

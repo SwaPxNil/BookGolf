@@ -13,40 +13,45 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "@react-navigation/native";
 import LessonCard from "../components/LessonCard";
+import { useCoach, useCoachLessons } from "../hooks/useCoach";
 
 export default function CoachDetailsScreen({ route }) {
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
-  
-  const coach = route?.params?.coach || {
-    name: "RAMESH KARKI",
-    rating: 4.3,
-    image: require("../assets/images/coach2.png"), 
+  const coachId = route?.params?.coachId || route?.params?.coach?.id || route?.params?.coach?._id;
+  const { data: coachResponse } = useCoach(coachId, { retry: false });
+  const { data: lessonsResponse } = useCoachLessons(coachId, { retry: false });
+
+  const coachData = coachResponse?.data?.data || {};
+  const lessonsData = Array.isArray(lessonsResponse?.data?.data) ? lessonsResponse.data.data : [];
+
+  const coach = {
+    id: coachData?._id || coachId || "",
+    name: coachData?.full_name || route?.params?.coach?.name || "Coach",
+    rating: Number(coachData?.rating ?? route?.params?.coach?.rating ?? 0).toFixed(1),
+    imageUrl: coachData?.profile_img || coachData?.image_url || null,
+    description:
+      coachData?.description ||
+      route?.params?.coach?.description ||
+      "Coach profile details are unavailable.",
+    reviewsCount: coachData?.reviews_count ?? 0,
+    studentsTaught: coachData?.students_taught ?? 0,
+    experienceYears: coachData?.experience_years ?? 0,
+    recommendationValue: coachData?.recommendation_value ?? 0,
   };
 
-  const dummyLessons = [
-    { 
-      id: 1, 
-      title: "FULL SWING ANALYSIS", 
-      description: "Break down your swing mechanics and improve consistency with video analysis",
-      fullDescription: "Improve your swing mechanics and consistency through detailed video analysis. The coach will record and break down your swing to identify issues with grip, stance, and motion, then provide clear adjustments and drills to help you develop a more efficient and repeatable swing. Analyze and refine your swing with detailed video feedback from your coach.",
-      time: "60min",
-      level: "Intermediate",
-      price: "12000" 
-    },
-    { 
-      id: 2, 
-      title: "SHORT GAME MASTERY", 
-      description: "Focus on chipping, pitching, and bunker play to lower your scores around the green.",
-      fullDescription: "A comprehensive session focused on the most critical part of the game. Learn techniques for consistent contact, distance control, and reading lies around the green to significantly lower your score.",
-      time: "45min",
-      level: "All Levels",
-      price: "9000" 
-    },
-  ];
+  const lessonList = lessonsData.map((lesson) => ({
+    id: lesson?._id,
+    title: lesson?.title || "Lesson",
+    description: "Lesson details",
+    fullDescription: `A focused ${lesson?.duration_minutes ?? 0} minute lesson session with this coach.`,
+    time: `${lesson?.duration_minutes ?? 0}min`,
+    level: "All Levels",
+    price: String(lesson?.price ?? 0),
+    lessonId: lesson?._id,
+  }));
 
   const handleLessonPress = (lesson) => {
-    // Navigate to LessonBookingScreen and pass both coach and lesson data
     navigation.navigate("LessonBooking", { coach, lesson });
   };
 
@@ -66,7 +71,14 @@ export default function CoachDetailsScreen({ route }) {
         
         {/* PROFILE INFO */}
         <View style={styles.profileSection}>
-          <Image source={coach.image} style={styles.profilePic} />
+          <Image
+            source={
+              coach.imageUrl
+                ? { uri: coach.imageUrl }
+                : require("../assets/images/coach2.png")
+            }
+            style={styles.profilePic}
+          />
           <View style={styles.profileTextContainer}>
             <Text style={styles.coachName}>{coach.name}</Text>
             <View style={styles.ratingRow}>
@@ -74,41 +86,44 @@ export default function CoachDetailsScreen({ route }) {
                 <Ionicons name="star" size={14} color="#FFD700" />
                 <Text style={styles.ratingText}>{coach.rating}</Text>
               </View>
-              <Text style={styles.reviewsText}>218 reviews</Text>
+              <Text style={styles.reviewsText}>{coach.reviewsCount} reviews</Text>
             </View>
           </View>
         </View>
 
         <Text style={styles.descriptionText}>
-          "Helping golfers improve their swing mechanics and consistency on the course. Every student, every level."
+          {coach.description}
         </Text>
 
         {/* STATS CIRCLES */}
         <View style={styles.statsRow}>
-          <StatCircle number="218" text="reviews" />
-          <StatCircle number="320" text="students" />
-          <StatCircle number="6" text="years" />
-          <StatCircle number="90%" text="suggested" />
+          <StatCircle number={String(coach.reviewsCount)} text="reviews" />
+          <StatCircle number={String(coach.studentsTaught)} text="students" />
+          <StatCircle number={String(coach.experienceYears)} text="years" />
+          <StatCircle
+            number={`${Math.round(Number(coach.recommendationValue || 0))}%`}
+            text="suggested"
+          />
         </View>
 
         {/* LESSON LISTS */}
         <LessonSection 
           title="TOP RATED" 
-          lessons={dummyLessons} 
+          lessons={lessonList} 
           width={width} 
           cardColor="#0A2024" 
           onLessonPress={handleLessonPress}
         />
         <LessonSection 
           title="AVAILABLE NOW" 
-          lessons={dummyLessons} 
+          lessons={lessonList} 
           width={width} 
           cardColor="#27352A" 
           onLessonPress={handleLessonPress}
         />
         <LessonSection 
           title="IMPROVE YOUR DRIVE" 
-          lessons={dummyLessons} 
+          lessons={lessonList} 
           width={width} 
           cardColor="#28343A" 
           onLessonPress={handleLessonPress}

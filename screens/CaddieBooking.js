@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,11 +8,13 @@ import {
   ScrollView,
   Dimensions,
   Animated,
+  RefreshControl,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { useCaddie, useCaddieAvailability } from "../hooks/useCaddie";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -22,14 +24,27 @@ const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.6;
 export default function CaddieBookingScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  
-  const caddie = route?.params?.caddie || {
-    name: "RAMESH KARKI",
-    image: require("../assets/images/caddie2.png"), 
-    rating: "4.8",
-    matches: "150+",
-    experience: "5 Years",
-    speciality: "Green Reading"
+  const caddieId = route?.params?.caddieId || route?.params?.caddie?.id || route?.params?.caddie?._id;
+  const {
+    data: caddieResponse,
+    isLoading: caddieLoading,
+    refetch: refetchCaddie,
+  } = useCaddie(caddieId, { retry: false });
+  const {
+    data: availabilityResponse,
+    isLoading: availabilityLoading,
+    refetch: refetchAvailability,
+  } = useCaddieAvailability(caddieId, { retry: false });
+
+  const caddieData = caddieResponse?.data?.data || {};
+  const caddie = {
+    id: caddieData?._id || caddieId || "",
+    name: caddieData?.full_name || route?.params?.caddie?.name || "Caddie",
+    imageUrl: caddieData?.profile_img || caddieData?.image_url || route?.params?.caddie?.imageUrl || null,
+    rating: String(Number(caddieData?.rating ?? route?.params?.caddie?.rating ?? 0).toFixed(1)),
+    matches: `${caddieData?.matches_caddied ?? 0}+`,
+    experience: `${caddieData?.experience ?? caddieData?.experience_years ?? 0} Years`,
+    speciality: caddieData?.speciality || route?.params?.caddie?.speciality || "General support",
   };
   
   const service = {
@@ -43,6 +58,7 @@ export default function CaddieBookingScreen() {
   const [step, setStep] = useState(1); 
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   const animState = useRef(new Animated.Value(0)).current;
 
@@ -81,21 +97,60 @@ export default function CaddieBookingScreen() {
   
   const headerTranslateY = animState.interpolate({ inputRange: [0, 1, 2], outputRange: [85, 85, 0] });
 
-  const dates = [
-    { day: "16", label: "Mon", value: "2026-03-16" },
-    { day: "17", label: "Tue", value: "2026-03-17" },
-    { day: "18", label: "Wed", value: "2026-03-18" },
-    { day: "19", label: "Thu", value: "2026-03-19" },
-    { day: "20", label: "Fri", value: "2026-03-20" },
-  ];
-  const timeSlots = [
-    { id: 1, slotText: "06:30 - 10:30" },
-    { id: 2, slotText: "08:00 - 12:00" },
-    { id: 3, slotText: "10:30 - 14:30" },
-    { id: 4, slotText: "13:00 - 17:00" },
-  ];
+  const availabilitySlots = Array.isArray(availabilityResponse?.data?.data)
+    ? availabilityResponse.data.data
+    : Array.isArray(caddieData?.availability_slots)
+    ? caddieData.availability_slots
+    : [];
+
+  const formatDateLabel = (isoValue) => {
+    const dt = new Date(isoValue);
+    return {
+      day: String(dt.getDate()).padStart(2, "0"),
+      label: dt.toLocaleDateString("en-US", { weekday: "short" }),
+      value: dt.toISOString().slice(0, 10),
+    };
+  };
+
+  const formatTime = (isoValue) => {
+    const dt = new Date(isoValue);
+    return dt.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  };
+
+  const dates = useMemo(() => {
+    const uniqueDateMap = new Map();
+
+    availabilitySlots.forEach((slot) => {
+      const formatted = formatDateLabel(slot);
+      if (!uniqueDateMap.has(formatted.value)) {
+        uniqueDateMap.set(formatted.value, formatted);
+      }
+    });
+
+    return Array.from(uniqueDateMap.values());
+  }, [availabilitySlots]);
 
   const activeDateValue = selectedDate || dates[0]?.value || "";
+  const timeSlots = useMemo(() => {
+    return availabilitySlots
+      .filter((slot) => slot?.slice(0, 10) === activeDateValue)
+      .map((slot) => ({ id: slot, value: slot, slotText: formatTime(slot) }));
+  }, [availabilitySlots, activeDateValue]);
+
+  const isLoadingBookingData = Boolean(caddieId) && (caddieLoading || availabilityLoading);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refetchCaddie(), refetchAvailability()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -103,7 +158,11 @@ export default function CaddieBookingScreen() {
 
       {/* BACKGROUND IMAGE */}
       <ImageBackground 
-        source={caddie.image} 
+        source={
+          caddie.imageUrl
+            ? { uri: caddie.imageUrl }
+            : require("../assets/images/caddie2.png")
+        }
         style={styles.backgroundImage} 
         resizeMode="cover"
       >
@@ -141,41 +200,48 @@ export default function CaddieBookingScreen() {
       <Animated.View pointerEvents={step === 1 ? 'auto' : 'none'} style={[styles.cardContainer, { opacity: bigCardOpacity, transform: [{ translateY: bigCardTranslateY }] }]}>
         
         {/* Scrollable Area */}
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
-          <View style={styles.step1Content}>
-            <Text style={styles.sectionHeaderSmall}>CADDIE DETAILS</Text>
-            <Text style={styles.bigCardTitle}>{caddie.name}</Text>
-            <Text style={styles.bigCardDesc}>{service.fullDescription}</Text>
-            
-            <View style={styles.infoTable}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>RATING</Text>
-                <View style={styles.infoValueContainer}>
-                  <Ionicons name="star" size={18} color="#FFD700" />
-                  <Text style={styles.infoValue}>{caddie.rating}</Text>
-                </View>
-              </View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.scrollArea}
+        >
+          {isLoadingBookingData ? (
+            <BookingSkeleton />
+          ) : (
+            <View style={styles.step1Content}>
+              <Text style={styles.sectionHeaderSmall}>CADDIE DETAILS</Text>
+              <Text style={styles.bigCardTitle}>{caddie.name}</Text>
+              <Text style={styles.bigCardDesc}>{service.fullDescription}</Text>
               
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>MATCHES CADDIED</Text>
-                <View style={styles.infoValueContainer}>
-                  <Text style={[styles.infoValue, { color: "#fff" }]}>{caddie.matches}</Text>
+              <View style={styles.infoTable}>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>RATING</Text>
+                  <View style={styles.infoValueContainer}>
+                    <Ionicons name="star" size={18} color="#FFD700" />
+                    <Text style={styles.infoValue}>{caddie.rating}</Text>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>EXPERIENCE</Text>
-                <View style={styles.infoValueContainer}>
-                  <Text style={[styles.infoValue, { color: "#FAFF5D" }]}>{caddie.experience}</Text>
+                
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>MATCHES CADDIED</Text>
+                  <View style={styles.infoValueContainer}>
+                    <Text style={[styles.infoValue, { color: "#fff" }]}>{caddie.matches}</Text>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>SPECIALITY</Text>
-                <View style={styles.infoValueContainer}>
-                  <Text style={[styles.infoValue, { color: "#fff" }]}>{caddie.speciality}</Text>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>EXPERIENCE</Text>
+                  <View style={styles.infoValueContainer}>
+                    <Text style={[styles.infoValue, { color: "#FAFF5D" }]}>{caddie.experience}</Text>
+                  </View>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>SPECIALITY</Text>
+                  <View style={styles.infoValueContainer}>
+                    <Text style={[styles.infoValue, { color: "#fff" }]}>{caddie.speciality}</Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
+          )}
         </ScrollView>
         
         <View style={styles.nextBtnContainer}>
@@ -188,7 +254,13 @@ export default function CaddieBookingScreen() {
 
       <Animated.View pointerEvents={step === 2 ? 'auto' : 'none'} style={[styles.cardContainer, { transform: [{ translateY: bottomSheetTranslateY }] }]}>
         
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.scrollArea}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#FFFFFF" />
+          }
+        >
           
           <View style={styles.sheetHeader}>
             <Ionicons name="calendar" size={20} color="#fff" />
@@ -206,6 +278,9 @@ export default function CaddieBookingScreen() {
               )
             })}
           </ScrollView>
+          {!isLoadingBookingData && dates.length === 0 ? (
+            <Text style={styles.emptyText}>No available reservation dates for this caddie.</Text>
+          ) : null}
 
           <View style={[styles.sheetHeader, { marginTop: 10 }]}>
             <Ionicons name="time" size={20} color="#fff" />
@@ -214,14 +289,17 @@ export default function CaddieBookingScreen() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
             {timeSlots.map((slot) => {
-              const isActive = selectedSlot === slot.slotText;
+              const isActive = selectedSlot === slot.value;
               return (
-                <TouchableOpacity key={slot.id} style={[styles.timeSlot, isActive && styles.timeSlotActive]} onPress={() => setSelectedSlot(slot.slotText)}>
+                <TouchableOpacity key={slot.id} style={[styles.timeSlot, isActive && styles.timeSlotActive]} onPress={() => setSelectedSlot(slot.value)}>
                   <Text style={[styles.timeText, isActive && styles.timeTextActive]}>{slot.slotText}</Text>
                 </TouchableOpacity>
               )
             })}
           </ScrollView>
+          {!isLoadingBookingData && dates.length > 0 && timeSlots.length === 0 ? (
+            <Text style={styles.emptyText}>No available time slots on the selected date.</Text>
+          ) : null}
         </ScrollView>
 
         <View style={styles.footerRow}>
@@ -238,6 +316,17 @@ export default function CaddieBookingScreen() {
     </View>
   );
 }
+
+const BookingSkeleton = () => (
+  <View style={styles.step1Content}>
+    <View style={styles.skeletonHeader} />
+    <View style={styles.skeletonTitle} />
+    <View style={styles.skeletonParagraph} />
+    <View style={styles.skeletonParagraph} />
+    <View style={styles.skeletonRow} />
+    <View style={styles.skeletonRow} />
+  </View>
+);
 
 const COLORS = { 
   dark: "#2A2E2A", 
@@ -278,9 +367,12 @@ const styles = StyleSheet.create({
     bottom: 0, 
     width: SCREEN_WIDTH, 
     height: BOTTOM_SHEET_HEIGHT, 
-    backgroundColor: COLORS.dark, 
+    backgroundColor: "rgba(42, 46, 42, 0.82)", 
     borderTopLeftRadius: 35,  
     borderTopRightRadius: 35, 
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
+    overflow: "hidden",
     paddingTop: 30, 
     paddingBottom: 25, 
     zIndex: 20,
@@ -493,6 +585,46 @@ nextBtnContainer: {
     color: COLORS.white,
     fontFamily: "Abel",
     fontSize: 18,
+  },
+
+  emptyText: {
+    color: COLORS.lightGray,
+    fontFamily: "Abel",
+    fontSize: 14,
+    paddingHorizontal: 25,
+    marginTop: 4,
+  },
+
+  skeletonHeader: {
+    width: 140,
+    height: 20,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    marginBottom: 14,
+  },
+
+  skeletonTitle: {
+    width: "82%",
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    marginBottom: 10,
+  },
+
+  skeletonParagraph: {
+    width: "100%",
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    marginBottom: 8,
+  },
+
+  skeletonRow: {
+    width: "92%",
+    height: 18,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    marginTop: 12,
   },
 
   footerRow: {

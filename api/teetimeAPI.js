@@ -7,10 +7,21 @@ export const getTeeTimesForCourse = (courseId) => {
 
 /* CREATE TEE TIME (COURSE_ADMIN) */
 export const createTeeTime = (payload) => {
-  return authAxios.post("/tee-times", payload);
+  const normalizedPayload = {
+    ...payload,
+    course_id: payload?.course_id ?? payload?.courseId,
+    slot_time: payload?.slot_time ?? payload?.slotTime,
+  };
+
+  return authAxios.post("/tee-times", normalizedPayload);
 };
 
 /* BOOK TEE TIME (USER) */
 export const bookTeeTime = (payload) => {
-  return authAxios.post("/tee-times/book", payload);
+  const normalizedPayload = {
+    ...payload,
+    teeTimeId: payload?.teeTimeId ?? payload?.tee_time_id,
+  };
+
+  return authAxios.post("/tee-times/book", normalizedPayload);
 };

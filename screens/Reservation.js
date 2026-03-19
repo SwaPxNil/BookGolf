@@ -6,6 +6,7 @@ import {
   ImageBackground,
   TouchableOpacity,
   ScrollView,
+  RefreshControl,
   Dimensions,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -21,11 +22,20 @@ export default function ReservationScreen({ route }) {
   const navigation = useNavigation();
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   
   const course = route?.params?.course || {
     name: "GOKARNA FOREST RESORT",
     image: require("../assets/images/course1.png"),
   };
+
+  const courseImageSource = course?.imageUrl
+    ? { uri: course.imageUrl }
+    : course?.image_url
+    ? { uri: course.image_url }
+    : course?.image
+    ? course.image
+    : require("../assets/images/course1.png");
 
   const courseName = course.name;
   const selectedPrice = "12000";
@@ -48,13 +58,22 @@ export default function ReservationScreen({ route }) {
 
   const activeDateValue = selectedDate || dates[0]?.value || "";
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setSelectedDate("");
+    setSelectedSlot("");
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 400);
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
 
       {/* BACKGROUND IMAGE */}
       <ImageBackground
-        source={course.image}
+        source={courseImageSource}
         style={styles.backgroundImage}
         resizeMode="cover"
       >
@@ -80,7 +99,13 @@ export default function ReservationScreen({ route }) {
       {/* BOTTOM SHEET */}
       <View style={styles.bottomSheet}>
         
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollArea}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.scrollArea}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#FFFFFF" />
+          }
+        >
           
           {/* DATE SELECTION */}
           <View style={styles.sectionHeader}>
@@ -210,9 +235,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: SCREEN_WIDTH,
     height: BOTTOM_SHEET_HEIGHT, 
-    backgroundColor: COLORS.dark,
+    backgroundColor: "rgba(42, 46, 42, 0.82)",
     borderTopLeftRadius: 35,
     borderTopRightRadius: 35,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
+    overflow: "hidden",
     paddingTop: 30,
     paddingBottom: 25, 
   },

@@ -14,44 +14,58 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 
-import Header from "../components/Header"; 
-import Navbar from "../components/Navbar"; 
+import Header from "../components/Header";
+import Navbar from "../components/Navbar";
+import { useCourses } from "../hooks/useCourse";
+import { useMyProfile } from "../hooks/useAuth";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const ITEM_WIDTH = SCREEN_WIDTH * 0.75;
 const ITEM_SPACING = (SCREEN_WIDTH - ITEM_WIDTH) / 2;
 
-const COURSES = [
-  {
-    id: "1",
-    name: "ROYAL NEPAL GOLF CLUB",
-    description: "Historic 9-hole golf course located near Tribhuvan Airport in Kathmandu.",
-    location: "Nepal, Asia",
-    image: require("../assets/images/course1.png"), 
-  },
-  {
-    id: "2",
-    name: "GOKARNA FOREST RESORT",
-    description: "18-hole championship golf course set within the serene Gokarna Forest.",
-    location: "Nepal, Asia",
-    image: require("../assets/images/course2.png"), 
-  },
-  {
-    id: "3",
-    name: "HIMALAYAN GOLF COURSE",
-    description: "Spectacular gorge-side course offering unique challenges in Pokhara.",
-    location: "Nepal, Asia",
-    image: require("../assets/images/course1.png"), 
-  },
-];
-
 export default function CoursesScreen() {
   const navigation = useNavigation();
   const scrollX = useRef(new Animated.Value(0)).current;
   const [activeIndex, setActiveIndex] = useState(0);
-const [currentTab, setCurrentTab] = useState("courses");
+  const [currentTab, setCurrentTab] = useState("courses");
   const { width, height } = useWindowDimensions();
+  const { data: coursesResponse, refetch: refetchCourses } = useCourses({ retry: false });
+  const { data: profileData } = useMyProfile({ retry: false });
+  const [refreshing, setRefreshing] = useState(false);
+  const profile = profileData?.data?.data ?? profileData?.data ?? {};
+  const avatarSource = profile?.profile_img
+    ? { uri: profile.profile_img }
+    : require("../assets/images/Avatar.png");
+
+  const courses = Array.isArray(coursesResponse?.data?.data)
+    ? coursesResponse.data.data
+    : [];
+
+  const uiCourses = courses.map((course, index) => ({
+    id: course?._id ?? String(index),
+    name: course?.name ?? "Unnamed Course",
+    description:
+      course?.description ||
+      course?.location ||
+      "Course details are currently unavailable.",
+    location: course?.location || "Location unavailable",
+    imageUrl: course?.image_url || null,
+    raw: course,
+  }));
+
+  const fallbackCourses = [
+    {
+      id: "fallback-1",
+      name: "COURSE DATA UNAVAILABLE",
+      description: "Unable to load courses from server right now.",
+      location: "Please try again",
+      imageUrl: null,
+      raw: null,
+    },
+  ];
+
+  const coursesToRender = uiCourses.length > 0 ? uiCourses : fallbackCourses;
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length > 0) {
@@ -64,13 +78,22 @@ const [currentTab, setCurrentTab] = useState("courses");
   }).current;
 
   const handleStartRound = () => {
-    const selectedCourse = COURSES[activeIndex];
-    navigation.navigate("ReservationScreen", { course: selectedCourse });
+    const selectedCourse = coursesToRender[activeIndex] || coursesToRender[0];
+    navigation.navigate("ReservationScreen", { course: selectedCourse?.raw || selectedCourse });
   };
 
   const onTabPress = (tab) => {
     setCurrentTab(tab);
     navigation.navigate(tab);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchCourses();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const renderItem = ({ item, index }) => {
@@ -82,15 +105,22 @@ const [currentTab, setCurrentTab] = useState("courses");
 
     const scale = scrollX.interpolate({
       inputRange,
-      outputRange: [0.85, 1, 0.85], 
+      outputRange: [0.85, 1, 0.85],
       extrapolate: "clamp",
     });
 
     return (
       <View style={{ width: ITEM_WIDTH }}>
         <Animated.View style={[styles.cardContainer, { transform: [{ scale }] }]}>
-          <Image source={item.image} style={styles.cardImage} />
-          
+          <Image
+            source={
+              item.imageUrl
+                ? { uri: item.imageUrl }
+                : require("../assets/images/course1.png")
+            }
+            style={styles.cardImage}
+          />
+
           <View style={styles.cardTextContainer}>
             <Text style={styles.cardTitle}>{item.name}</Text>
             <Text style={styles.cardDescription}>{item.description}</Text>
@@ -104,7 +134,6 @@ const [currentTab, setCurrentTab] = useState("courses");
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* PROFILE PIC (Absolutely positioned like your Caddie screen) */}
       <TouchableOpacity
         style={[
           styles.profileContainer,
@@ -113,32 +142,32 @@ const [currentTab, setCurrentTab] = useState("courses");
         onPress={() => navigation.navigate("profile")}
       >
         <Image
-          source={require("../assets/images/Avatar.png")}
+          source={avatarSource}
           style={styles.profileImage}
         />
       </TouchableOpacity>
 
-      {/* HEADER COMPONENT */}
       <Header
         title="COURSES"
         subtitle="Choose a course to begin your round."
       />
 
-      {/* LOCATION ROW (Tucked right under the header) */}
       <View style={styles.locationRow}>
         <Ionicons name="globe-outline" size={14} color="#333" />
-        <Text style={styles.locationText}>{COURSES[activeIndex].location}</Text>
+        <Text style={styles.locationText}>
+          {coursesToRender[activeIndex]?.location || "Location unavailable"}
+        </Text>
       </View>
 
-      {/* BODY */}
       <View style={styles.contentBody}>
-        {/* HORIZONTAL CAROUSEL */}
         <View style={styles.carouselContainer}>
           <Animated.FlatList
-            data={COURSES}
+            data={coursesToRender}
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
             snapToInterval={ITEM_WIDTH}
             decelerationRate="fast"
             contentContainerStyle={{ paddingHorizontal: ITEM_SPACING }}
@@ -152,20 +181,17 @@ const [currentTab, setCurrentTab] = useState("courses");
           />
         </View>
 
-        {/* START ROUND BUTTON */}
         <TouchableOpacity style={styles.startBtn} onPress={handleStartRound}>
           <Ionicons name="flag" size={20} color="#FFF" style={styles.flagIcon} />
           <Text style={styles.startBtnText}>START ROUND</Text>
         </TouchableOpacity>
       </View>
 
-      {/* NAVBAR */}
       <Navbar
         currentTab={currentTab}
         onTabPress={onTabPress}
-        onPressMiddle={() => {}} 
+        onPressMiddle={() => {}}
       />
-
     </SafeAreaView>
   );
 }
@@ -175,7 +201,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#E6E1D3",
   },
-  
+
   profileContainer: {
     position: "absolute",
     width: 45,
@@ -192,7 +218,7 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20, 
+    paddingHorizontal: 20,
     marginTop: 8,
   },
   locationText: {
@@ -204,10 +230,10 @@ const styles = StyleSheet.create({
 
   contentBody: {
     flex: 1,
-    paddingBottom: 110, 
+    paddingBottom: 110,
   },
   carouselContainer: {
-    height: SCREEN_HEIGHT * 0.45, 
+    height: SCREEN_HEIGHT * 0.45,
     marginTop: 25,
   },
   cardContainer: {
@@ -228,7 +254,7 @@ const styles = StyleSheet.create({
     width: "100%",
     padding: 20,
     paddingTop: 60,
-    backgroundColor: "rgba(0,0,0,0.4)", 
+    backgroundColor: "rgba(0,0,0,0.4)",
   },
   cardTitle: {
     color: "#FFF",
@@ -245,16 +271,16 @@ const styles = StyleSheet.create({
     fontFamily: "Abel",
     lineHeight: 20,
   },
-  
+
   startBtn: {
-    backgroundColor: "#798D3D", 
+    backgroundColor: "#798D3D",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
     marginHorizontal: 40,
     borderRadius: 30,
-    marginTop: 30
+    marginTop: 30,
   },
   flagIcon: {
     marginRight: 10,

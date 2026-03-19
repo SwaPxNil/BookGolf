@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  RefreshControl,
   Image,
   useWindowDimensions,
   StatusBar,
@@ -22,10 +23,16 @@ export default function ProfileScreen() {
   const { width, height } = useWindowDimensions();
   const navigation = useNavigation();
   const [currentTab, setCurrentTab] = useState("profile");
-  const { data: profileData, isLoading: profileLoading, isError: profileError } = useMyProfile({ retry: false });
-  const { data: paymentsData } = useMyPayments({ retry: false });
-  const { data: courseAdminsData } = useCourseAdmins({ retry: false });
-  const { data: adminLogsData } = useAdminLogs({ retry: false });
+  const [refreshing, setRefreshing] = useState(false);
+  const {
+    data: profileData,
+    isLoading: profileLoading,
+    isError: profileError,
+    refetch: refetchProfile,
+  } = useMyProfile({ retry: false });
+  const { data: paymentsData, refetch: refetchPayments } = useMyPayments({ retry: false });
+  const { data: courseAdminsData, refetch: refetchCourseAdmins } = useCourseAdmins({ retry: false });
+  const { data: adminLogsData, refetch: refetchAdminLogs } = useAdminLogs({ retry: false });
   const refreshTokenMutation = useRefreshToken();
 
   const profile = profileData?.data?.data ?? profileData?.data ?? {};
@@ -45,6 +52,20 @@ export default function ProfileScreen() {
     ? adminLogsData.data
     : [];
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.allSettled([
+        refetchProfile(),
+        refetchPayments(),
+        refetchCourseAdmins(),
+        refetchAdminLogs(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const handleTabPress = (tab) => navigation.navigate(tab);
 
   return (
@@ -59,7 +80,12 @@ export default function ProfileScreen() {
         <Ionicons name="arrow-back" size={26} color="#262B27" />
       </TouchableOpacity>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#333" />
+        }
+      >
         {/* PROFILE IMAGE + EDIT */}
         <View
           style={{
@@ -70,7 +96,11 @@ export default function ProfileScreen() {
           }}
         >
           <Image
-            source={require("../assets/images/Avatar.png")}
+            source={
+              profile?.profile_img
+                ? { uri: profile.profile_img }
+                : require("../assets/images/Avatar.png")
+            }
             style={{ width: "100%", height: "100%", borderRadius: (width * 0.28) / 2 }}
           />
           <TouchableOpacity
@@ -85,6 +115,7 @@ export default function ProfileScreen() {
               alignItems: "center",
               justifyContent: "center",
             }}
+            onPress={() => navigation.navigate("EditProfile")}
           >
             <Ionicons name="pencil" size={16} color="#798D3D" />
           </TouchableOpacity>
@@ -127,7 +158,11 @@ export default function ProfileScreen() {
             borderRadius: width * 0.05,
           }}
         >
-          <Option icon="person-outline" title="Edit profile information" />
+          <Option
+            icon="person-outline"
+            title="Edit profile information"
+            onPress={() => navigation.navigate("EditProfile")}
+          />
           <OptionRight icon="notifications" title="Notifications" value="ON" />
           <OptionRight icon="language-sharp" title="Language" value="ENGLISH" />
           <OptionRight icon="card-outline" title="Payments" value={`${payments.length}`} />
@@ -181,8 +216,12 @@ export default function ProfileScreen() {
 
 /* ---------------------- REUSABLE OPTION COMPONENTS ---------------------- */
 
-const Option = ({ icon, title }) => (
-  <TouchableOpacity style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 }}>
+const Option = ({ icon, title, onPress }) => (
+  <TouchableOpacity
+    style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 }}
+    onPress={onPress}
+    disabled={!onPress}
+  >
     <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
       <Ionicons name={icon} size={20} color="#fff" />
       <Text style={{ color: "#fff", fontSize: 16, fontFamily: "Abel" }}>{title}</Text>

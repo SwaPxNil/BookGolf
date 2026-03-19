@@ -10,7 +10,9 @@ import ProfileScreen from './screens/ProfileScreen';
 import HomeScreen from './screens/HomeScreen';
 import SearchScreen from './screens/SearchScreen';
 import LoginScreen from './screens/LoginScreen';
+import Verify2FAScreen from './screens/Verify2FAScreen';
 import SignUpScreen from './screens/SignUpScreen';
+import EditProfileScreen from './screens/EditProfileScreen';
 import * as Font from "expo-font";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { getAccessToken } from './api/tokenStorage';
@@ -69,6 +71,20 @@ export default function App() {
                   />
                 )}
               </Stack.Screen>
+              <Stack.Screen
+                name="Verify2FA"
+                options={{
+                  presentation: 'transparentModal',
+                  animation: 'fade',
+                }}
+              >
+                {(props) => (
+                  <Verify2FAScreen
+                    {...props}
+                    onLoginSuccess={() => setIsAuthenticated(true)}
+                  />
+                )}
+              </Stack.Screen>
               <Stack.Screen name="SignUp" component={SignUpScreen} />
             </>
           ) : (
@@ -80,6 +96,7 @@ export default function App() {
               <Stack.Screen name="match" component={MatchHistoryScreen} />
               <Stack.Screen name="caddie" component={CaddieScreen} />
               <Stack.Screen name="profile" component={ProfileScreen} />
+              <Stack.Screen name="EditProfile" component={EditProfileScreen} />
               <Stack.Screen name="SearchScreen" component={SearchScreen} />
               <Stack.Screen name="CoachDetails" component={CoachDetailsScreen}/>
               <Stack.Screen name="LessonBooking" component={LessonBookingScreen}/>

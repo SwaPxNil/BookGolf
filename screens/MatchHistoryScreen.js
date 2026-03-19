@@ -7,16 +7,18 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  RefreshControl,
   Image,
   StatusBar,
   useWindowDimensions,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Header from "../components/Header"; 
+import Header from "../components/Header";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import Navbar from "../components/Navbar";
 import { useCalculateHandicap } from "../hooks/useHandicap";
+import { useMyProfile } from "../hooks/useAuth";
 import { useMyRounds } from "../hooks/useRound";
 
 export default function MatchHistoryScreen() {
@@ -24,10 +26,21 @@ export default function MatchHistoryScreen() {
   const [score1, setScore1] = useState("");
   const [score2, setScore2] = useState("");
   const [calculatedHandicap, setCalculatedHandicap] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
   const [currentTab, setCurrentTab] = useState("match");
   const calculateHandicapMutation = useCalculateHandicap();
-  const { data: roundsData, isLoading: roundsLoading, isError: roundsError } = useMyRounds({ retry: false });
+  const { data: profileData } = useMyProfile({ retry: false });
+  const {
+    data: roundsData,
+    isLoading: roundsLoading,
+    isError: roundsError,
+    refetch: refetchRounds,
+  } = useMyRounds({ retry: false });
+  const profile = profileData?.data?.data ?? profileData?.data ?? {};
+  const avatarSource = profile?.profile_img
+    ? { uri: profile.profile_img }
+    : require("../assets/images/Avatar.png");
 
   const handleTabPress = (tab) => navigation.navigate(tab);
 
@@ -45,6 +58,30 @@ export default function MatchHistoryScreen() {
     : [];
 
   const recentRounds = rounds.slice(0, 4);
+
+  const formatRoundDate = (round) => {
+    const rawDate = round?.round_date || round?.played_at || round?.date;
+    if (!rawDate) {
+      return { dateText: "Unknown date", timeText: "" };
+    }
+
+    const parsedDate = new Date(rawDate);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return { dateText: "Unknown date", timeText: "" };
+    }
+
+    return {
+      dateText: parsedDate.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+      }),
+      timeText: parsedDate.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+  };
 
   const handleCalculateHandicap = async () => {
     if (!score1 || !score2) {
@@ -70,9 +107,17 @@ export default function MatchHistoryScreen() {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchRounds();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* PROFILE */}
       <TouchableOpacity
         style={[
           styles.profileContainer,
@@ -81,16 +126,19 @@ export default function MatchHistoryScreen() {
         onPress={() => navigation.navigate("profile")}
       >
         <Image
-          source={require("../assets/images/Avatar.png")}
+          source={avatarSource}
           style={styles.profileImage}
         />
       </TouchableOpacity>
 
-      {/* HEADER */}
       <Header title="MATCH HISTORY" subtitle="Played rounds, refined handicap insights." />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: height * 0.18 }}>
-        {/* HANDICAP CALCULATOR CARD */}
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: height * 0.18 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#333" />
+        }
+      >
         <View
           style={[
             styles.card,
@@ -142,12 +190,13 @@ export default function MatchHistoryScreen() {
           )}
         </View>
 
-        {/* RECENT MATCHES */}
-        <Text style={[styles.recentTitle, { fontSize: width * 0.06, marginHorizontal: width * 0.055, marginTop: height * 0.03 }]}>
+        <Text style={[styles.recentTitle, { fontSize: width * 0.06, marginHorizontal: width * 0.055, marginTop: height * 0.03 }]}> 
           RECENT MATCHES
         </Text>
 
-        {recentRounds.map((round, index) => (
+        {recentRounds.map((round, index) => {
+          const { dateText, timeText } = formatRoundDate(round);
+          return (
           <View
             key={index}
             style={[
@@ -155,21 +204,22 @@ export default function MatchHistoryScreen() {
               { marginHorizontal: width * 0.05, borderRadius: width * 0.035, padding: width * 0.035 },
             ]}
           >
-            <Text style={[styles.matchDate, { fontSize: width * 0.04 }]}>
-              {round?.date || round?.played_at || "Unknown date"}{" "}
-              <Text style={[styles.matchTime, { fontSize: width * 0.035 }]}>
-                {round?.time_range || ""}
+            <Text style={[styles.matchDate, { fontSize: width * 0.04 }]}> 
+              {dateText}{" "}
+              <Text style={[styles.matchTime, { fontSize: width * 0.035 }]}> 
+                {timeText}
               </Text>
             </Text>
 
             <View style={styles.scoreText}>
               <Text style={{ fontSize: width * 0.038, color: "#444", fontFamily: "Abel" }}>Score:</Text>
-              <Text style={[styles.score, { fontSize: width * 0.07 }]}>
+              <Text style={[styles.score, { fontSize: width * 0.07 }]}> 
                 {round?.score ?? round?.total_score ?? "-"}
               </Text>
             </View>
           </View>
-        ))}
+          );
+        })}
         {roundsLoading ? <Text style={styles.metaText}>Loading match history...</Text> : null}
         {roundsError ? <Text style={styles.metaText}>Failed to load match history.</Text> : null}
         {!roundsLoading && !roundsError && recentRounds.length === 0 ? (

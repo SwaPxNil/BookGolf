@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
+  RefreshControl,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,57 +16,36 @@ import { StatusBar } from "expo-status-bar";
 
 import Header from "../components/Header";
 import Navbar from "../components/Navbar";
+import { useCaddies } from "../hooks/useCaddie";
+import { useMyProfile } from "../hooks/useAuth";
 
 export default function CaddieScreen({ navigation }) {
   const [currentTab, setCurrentTab] = useState("caddie");
   const [searchQuery, setSearchQuery] = useState("");
   const { width, height } = useWindowDimensions();
+  const { data: caddiesResponse, refetch: refetchCaddies } = useCaddies({ retry: false });
+  const { data: profileData } = useMyProfile({ retry: false });
+  const [refreshing, setRefreshing] = useState(false);
+  const profile = profileData?.data?.data ?? profileData?.data ?? {};
+  const avatarSource = profile?.profile_img
+    ? { uri: profile.profile_img }
+    : require("../assets/images/Avatar.png");
 
-  const caddies = [
-    {
-      id: 1,
-      name: "Deepak Adhikari",
-      matches: "430+ matches",
-      rating: 4.3,
-      status: "available",
-      image: require("../assets/images/caddie1.png"),
-      experience: "5 years",
-      speciality: "Wind and Green Reading"
-    },
-    {
-      id: 2,
-      name: "Ramesh Karki",
-      matches: "430+ matches",
-      rating: 4.3,
-      status: "available",
-      image: require("../assets/images/caddie2.png"),
-      experience: "5 years",
-      speciality: "Wind and Green Reading"
-
-
-    },
-    {
-      id: 3,
-      name: "Roshan Rai",
-      matches: "430+ matches",
-      rating: 4.3,
-      status: "available",
-      image: require("../assets/images/caddie3.png"),
-      experience: "5 years",
-      speciality: "Wind and Green Reading"
-    },
-    {
-      id: 4,
-      name: "Manoj Acharya",
-      matches: "430+ matches",
-      rating: 4.3,
-      status: "available",
-      image: require("../assets/images/caddie4.png"),
-      experience: "5 years",
-      speciality: "Wind and Green Reading"
-
-    },
-  ];
+  const caddies = Array.isArray(caddiesResponse?.data?.data)
+    ? caddiesResponse.data.data.map((caddie) => ({
+        id: caddie?._id,
+        name: caddie?.full_name || "Unnamed Caddie",
+        matches: `${caddie?.matches_caddied ?? 0} matches`,
+        rating: Number(caddie?.rating ?? 0).toFixed(1),
+        status:
+          Array.isArray(caddie?.availability_slots) && caddie.availability_slots.length > 0
+            ? "available"
+            : "busy",
+        imageUrl: caddie?.profile_img || caddie?.image_url || null,
+        experience: `${caddie?.experience ?? caddie?.experience_years ?? 0} years`,
+        speciality: caddie?.speciality || "General course support",
+      }))
+    : [];
 
   const filtered = caddies.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -77,14 +57,22 @@ export default function CaddieScreen({ navigation }) {
   const onTabPress = (tab) => navigation.navigate(tab);
 
   const handleCaddiePress = (caddie) => {
-    navigation.navigate("CaddieBooking", { caddie });
+    navigation.navigate("CaddieBooking", { caddieId: caddie.id, caddie });
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchCaddies();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* PROFILE */}
       <TouchableOpacity
         style={[
           styles.profileContainer,
@@ -93,18 +81,16 @@ export default function CaddieScreen({ navigation }) {
         onPress={() => navigation.navigate("profile")}
       >
         <Image
-          source={require("../assets/images/Avatar.png")}
+          source={avatarSource}
           style={styles.profileImage}
         />
       </TouchableOpacity>
 
-      {/* HEADER */}
       <Header
         title="HIRE A CADDIE"
         subtitle="Support that elevates every shot."
       />
 
-      {/* SEARCH */}
       <View style={[styles.searchRow, { marginHorizontal: width * 0.05 }]}>
         <Ionicons name="search-outline" size={20} color="#333" />
         <TextInput
@@ -116,12 +102,13 @@ export default function CaddieScreen({ navigation }) {
         />
       </View>
 
-      {/* CONTENT */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: height * 0.18 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#333" />
+        }
       >
-        {/* TOP RATED */}
         <CaddieSection
           title="TOP RATED"
           caddies={topRated}
@@ -129,7 +116,6 @@ export default function CaddieScreen({ navigation }) {
           onPress={handleCaddiePress}
         />
 
-        {/* AVAILABLE */}
         <CaddieSection
           title="AVAILABLE NOW"
           caddies={available}
@@ -138,7 +124,6 @@ export default function CaddieScreen({ navigation }) {
         />
       </ScrollView>
 
-      {/* NAVBAR */}
       <Navbar
         currentTab={currentTab}
         onTabPress={onTabPress}
@@ -147,7 +132,6 @@ export default function CaddieScreen({ navigation }) {
     </SafeAreaView>
   );
 }
-
 
 const CaddieSection = ({ title, caddies, width, onPress }) => (
   <View style={styles.sectionContainer}>
@@ -187,15 +171,20 @@ const CaddieCard = ({ caddie, width, isFirst, onPress }) => {
         },
       ]}
     >
-      <Image source={caddie.image} style={styles.cardImage} />
+      <Image
+        source={
+          caddie.imageUrl
+            ? { uri: caddie.imageUrl }
+            : require("../assets/images/caddie1.png")
+        }
+        style={styles.cardImage}
+      />
 
-      {/* Rating */}
       <View style={styles.rating}>
         <Ionicons name="star" size={14} color="#FFD700" />
         <Text style={styles.ratingText}>{caddie.rating}</Text>
       </View>
 
-      {/* Overlay */}
       <View style={styles.overlay}>
         <Text style={styles.name}>{caddie.name}</Text>
         <Text style={styles.exp}>{caddie.matches}</Text>
@@ -203,8 +192,6 @@ const CaddieCard = ({ caddie, width, isFirst, onPress }) => {
     </TouchableOpacity>
   );
 };
-
-//////////////// STYLES //////////////////
 
 const styles = StyleSheet.create({
   container: {
@@ -255,7 +242,7 @@ const styles = StyleSheet.create({
     fontFamily: "Abel",
   },
   scrollContent: {
-    paddingHorizontal: 20, 
+    paddingHorizontal: 20,
   },
   card: {
     height: 190,

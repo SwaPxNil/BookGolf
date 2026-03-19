@@ -86,14 +86,21 @@ export const useBookCaddie = (options = {}) => {
     mutationFn: bookCaddie,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["caddies"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
     },
     ...options,
   });
 };
 
 export const useCancelCaddieBooking = (options = {}) => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: cancelCaddieBooking,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["caddies"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
+    },
     ...options,
   });
 };

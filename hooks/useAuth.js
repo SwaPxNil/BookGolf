@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { getMyProfile, loginUser, refreshAccessToken, registerUser, verify2FA } from "../api/authAPI";
+import { getMyProfile, loginUser, refreshAccessToken, registerUser, resend2FA, updateMyProfile, verify2FA } from "../api/authAPI";
 
 
 /* REGISTER */
@@ -26,6 +26,14 @@ export const useVerify2FA = (options = {}) => {
   });
 };
 
+/* RESEND 2FA */
+export const useResend2FA = (options = {}) => {
+  return useMutation({
+    mutationFn: resend2FA,
+    ...options,
+  });
+};
+
 /* REFRESH ACCESS TOKEN */
 export const useRefreshToken = (options = {}) => {
   return useMutation({
@@ -39,6 +47,14 @@ export const useMyProfile = (options = {}) => {
   return useQuery({
     queryKey: ["me"],
     queryFn: getMyProfile,
+    ...options,
+  });
+};
+
+/* UPDATE CURRENT USER PROFILE */
+export const useUpdateMyProfile = (options = {}) => {
+  return useMutation({
+    mutationFn: updateMyProfile,
     ...options,
   });
 };

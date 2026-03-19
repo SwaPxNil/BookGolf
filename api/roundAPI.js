@@ -2,7 +2,13 @@ import { authAxios } from "./axiosInstance";
 
 /* CREATE ROUND */
 export const createRound = (payload) => {
-  return authAxios.post("/rounds", payload);
+  const normalizedPayload = {
+    ...payload,
+    // Backend currently validates user_id before overriding it with req.user.id.
+    user_id: payload?.user_id ?? "self",
+  };
+
+  return authAxios.post("/rounds", normalizedPayload);
 };
 
 /* GET CURRENT USER ROUNDS */

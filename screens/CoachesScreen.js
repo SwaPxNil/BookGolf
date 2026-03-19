@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
+  RefreshControl,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,46 +16,34 @@ import { StatusBar } from "expo-status-bar";
 
 import Header from "../components/Header";
 import Navbar from "../components/Navbar";
+import { useCoaches } from "../hooks/useCoach";
+import { useMyProfile } from "../hooks/useAuth";
 
 export default function CoachesScreen({ navigation }) {
   const [currentTab, setCurrentTab] = useState("coach");
   const [searchQuery, setSearchQuery] = useState("");
   const { width, height } = useWindowDimensions();
+  const { data: coachesResponse, refetch: refetchCoaches } = useCoaches({ retry: false });
+  const { data: profileData } = useMyProfile({ retry: false });
+  const [refreshing, setRefreshing] = useState(false);
+  const profile = profileData?.data?.data ?? profileData?.data ?? {};
+  const avatarSource = profile?.profile_img
+    ? { uri: profile.profile_img }
+    : require("../assets/images/Avatar.png");
 
-  const coaches = [
-    {
-      id: 1,
-      name: "Deepak Adhikari",
-      experience: "6 years experience",
-      rating: 4.3,
-      status: "available",
-      image: require("../assets/images/coach1.png"),
-    },
-    {
-      id: 2,
-      name: "Ramesh Karki",
-      experience: "6 years experience",
-      rating: 4.3,
-      status: "available",
-      image: require("../assets/images/coach2.png"),
-    },
-    {
-      id: 3,
-      name: "Roshan Rai",
-      experience: "5 years experience",
-      rating: 4.3,
-      status: "available",
-      image: require("../assets/images/coach3.png"),
-    },
-    {
-      id: 4,
-      name: "Manoj Acharya",
-      experience: "6 years experience",
-      rating: 4.3,
-      status: "available",
-      image: require("../assets/images/coach4.png"),
-    },
-  ];
+  const coaches = Array.isArray(coachesResponse?.data?.data)
+    ? coachesResponse.data.data.map((coach) => ({
+        id: coach?._id,
+        name: coach?.full_name || "Unnamed Coach",
+        experience: `${coach?.experience_years ?? 0} years experience`,
+        rating: Number(coach?.rating ?? 0).toFixed(1),
+        status:
+          Array.isArray(coach?.availability_slots) && coach.availability_slots.length > 0
+            ? "available"
+            : "busy",
+        imageUrl: coach?.profile_img || coach?.image_url || null,
+      }))
+    : [];
 
   const filtered = coaches.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -66,14 +55,22 @@ export default function CoachesScreen({ navigation }) {
   const onTabPress = (tab) => navigation.navigate(tab);
 
   const handleCoachPress = (coach) => {
-    navigation.navigate("CoachDetails", { coach });
+    navigation.navigate("CoachDetails", { coachId: coach.id, coach });
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchCoaches();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* PROFILE */}
       <TouchableOpacity
         style={[
           styles.profileContainer,
@@ -82,18 +79,16 @@ export default function CoachesScreen({ navigation }) {
         onPress={() => navigation.navigate("profile")}
       >
         <Image
-          source={require("../assets/images/Avatar.png")}
+          source={avatarSource}
           style={styles.profileImage}
         />
       </TouchableOpacity>
 
-      {/* HEADER */}
       <Header
         title="COACHES"
         subtitle="Expert Mentors Behind Every Swing"
       />
 
-      {/* SEARCH */}
       <View style={[styles.searchRow, { marginHorizontal: width * 0.05 }]}>
         <Ionicons name="search-outline" size={20} color="#333" />
         <TextInput
@@ -105,29 +100,28 @@ export default function CoachesScreen({ navigation }) {
         />
       </View>
 
-      {/* CONTENT */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: height * 0.18 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#333" />
+        }
       >
-        {/* TOP RATED SECTION */}
-        <CoachSection 
-          title="TOP RATED" 
-          coaches={topRated} 
-          width={width} 
-          onPress={handleCoachPress} 
+        <CoachSection
+          title="TOP RATED"
+          coaches={topRated}
+          width={width}
+          onPress={handleCoachPress}
         />
 
-        {/* AVAILABLE NOW SECTION */}
-        <CoachSection 
-          title="AVAILABLE NOW" 
-          coaches={available} 
-          width={width} 
-          onPress={handleCoachPress} 
+        <CoachSection
+          title="AVAILABLE NOW"
+          coaches={available}
+          width={width}
+          onPress={handleCoachPress}
         />
       </ScrollView>
 
-      {/* NAVBAR */}
       <Navbar
         currentTab={currentTab}
         onTabPress={onTabPress}
@@ -137,7 +131,6 @@ export default function CoachesScreen({ navigation }) {
   );
 }
 
-
 const CoachSection = ({ title, coaches, width, onPress }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.sectionHeader}>
@@ -145,16 +138,16 @@ const CoachSection = ({ title, coaches, width, onPress }) => (
       <Text style={styles.viewAll}>view all</Text>
     </View>
 
-    <ScrollView 
-      horizontal 
+    <ScrollView
+      horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.scrollContent}
     >
       {coaches.map((coach, index) => (
-        <CoachCard 
-          key={coach.id} 
-          coach={coach} 
-          width={width} 
+        <CoachCard
+          key={coach.id}
+          coach={coach}
+          width={width}
           isFirst={index === 0}
           onPress={() => onPress(coach)}
         />
@@ -165,26 +158,31 @@ const CoachSection = ({ title, coaches, width, onPress }) => (
 
 const CoachCard = ({ coach, width, isFirst, onPress }) => {
   return (
-    <TouchableOpacity 
-      activeOpacity={0.9} 
+    <TouchableOpacity
+      activeOpacity={0.9}
       onPress={onPress}
       style={[
-        styles.card, 
-        { 
+        styles.card,
+        {
           width: width * 0.40,
-          marginLeft: isFirst ? 0 : 10 
-        }
+          marginLeft: isFirst ? 0 : 10,
+        },
       ]}
     >
-      <Image source={coach.image} style={styles.cardImage} />
+      <Image
+        source={
+          coach.imageUrl
+            ? { uri: coach.imageUrl }
+            : require("../assets/images/coach1.png")
+        }
+        style={styles.cardImage}
+      />
 
-      {/* Rating */}
       <View style={styles.rating}>
         <Ionicons name="star" size={14} color="#FFD700" />
         <Text style={styles.ratingText}>{coach.rating}</Text>
       </View>
 
-      {/* Overlay Text */}
       <View style={styles.overlay}>
         <Text style={styles.name}>{coach.name}</Text>
         <Text style={styles.exp}>{coach.experience}</Text>
@@ -242,7 +240,7 @@ const styles = StyleSheet.create({
     fontFamily: "Abel",
   },
   scrollContent: {
-    paddingHorizontal: 20, 
+    paddingHorizontal: 20,
   },
   card: {
     height: 190,
