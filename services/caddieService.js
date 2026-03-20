@@ -50,50 +50,21 @@ const createCaddie = async (caddieData) => {
 };
 
 const getCaddies = async () => {
-  const caddies = await Caddie.find();
-
-  const bookingStats = await Booking.aggregate([
-    { $match: { booking_type: 'CADDIE', status: 'CONFIRMED' } },
-    { $group: { _id: '$caddie_id', count: { $sum: 1 } } },
-  ]);
-
-  const countByCaddie = new Map(
-    bookingStats.map((entry) => [String(entry._id), entry.count])
-  );
-
-  await Promise.all(
-    caddies.map(async (caddie) => {
-      const matchesCaddied = countByCaddie.get(String(caddie._id)) || 0;
-      if (caddie.matches_caddied !== matchesCaddied) {
-        caddie.matches_caddied = matchesCaddied;
-        await caddie.save();
-      }
-    })
-  );
-
-  return caddies;
+  return Caddie.find();
 };
 
 const getCaddieById = async (caddieId) => {
   const caddie = await Caddie.findById(caddieId);
-  if (!caddie) {
-    return null;
-  }
-
-  return syncCaddieMatches(caddie);
+  return caddie || null;
 };
 
 const updateCaddie = async (caddieId, caddieData) => {
   const normalizedCaddieData = normalizeCaddieData(caddieData);
 
-  let caddie = await Caddie.findByIdAndUpdate(caddieId, normalizedCaddieData, {
+  const caddie = await Caddie.findByIdAndUpdate(caddieId, normalizedCaddieData, {
     new: true,
     runValidators: true,
   });
-
-  if (caddie) {
-    caddie = await syncCaddieMatches(caddie);
-  }
 
   return caddie;
 };
@@ -135,10 +106,11 @@ const bookCaddie = async (userId, caddieId, slot) => {
 
     await booking.save();
 
-    caddie.matches_caddied = (caddie.matches_caddied || 0) + 1;
-    await caddie.save();
+    const updatedCaddie = await syncCaddieMatches(caddie);
+    const bookingResponse = booking.toObject();
+    bookingResponse.caddie = updatedCaddie;
 
-    return booking;
+    return bookingResponse;
 };
 
 const cancelCaddieBooking = async (bookingId, userId) => {
@@ -153,21 +125,25 @@ const cancelCaddieBooking = async (bookingId, userId) => {
     }
 
     if (booking.status === 'CANCELLED') {
-      return booking;
+      const existingCaddie = await Caddie.findById(booking.caddie_id);
+      const syncedExistingCaddie = existingCaddie ? await syncCaddieMatches(existingCaddie) : null;
+      const existingBookingResponse = booking.toObject();
+      existingBookingResponse.caddie = syncedExistingCaddie;
+      return existingBookingResponse;
     }
     
     booking.status = 'CANCELLED';
     await booking.save();
 
     const caddie = await Caddie.findById(booking.caddie_id);
-    if (caddie) {
-      await syncCaddieMatches(caddie);
-    }
+    const syncedCaddie = caddie ? await syncCaddieMatches(caddie) : null;
 
     // Make the caddie available again for the slot, if we stored the slot in the booking
     // For now, we are not re-adding the slot to the caddie's availability
     
-    return booking;
+    const bookingResponse = booking.toObject();
+    bookingResponse.caddie = syncedCaddie;
+    return bookingResponse;
 };
 
 module.exports = {
