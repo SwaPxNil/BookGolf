@@ -6,6 +6,21 @@ import {
   saveAuthTokens,
 } from "./tokenStorage";
 
+// Simple event emitter for logout
+export const logoutListeners = [];
+export function addLogoutListener(fn) {
+  logoutListeners.push(fn);
+}
+export function removeLogoutListener(fn) {
+  const idx = logoutListeners.indexOf(fn);
+  if (idx !== -1) logoutListeners.splice(idx, 1);
+}
+function emitLogout() {
+  logoutListeners.forEach((fn) => {
+    try { fn(); } catch {}
+  });
+}
+
 const DEFAULT_API_URL = "http://192.168.1.64:5000/api";
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL;
 
@@ -115,6 +130,7 @@ authAxios.interceptors.response.use(
       return authAxios(originalRequest);
     } catch (refreshError) {
       await clearAuthTokens();
+      emitLogout();
       return Promise.reject(refreshError);
     }
   }

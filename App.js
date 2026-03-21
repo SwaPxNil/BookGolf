@@ -16,6 +16,7 @@ import EditProfileScreen from './screens/EditProfileScreen';
 import * as Font from "expo-font";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { getAccessToken } from './api/tokenStorage';
+import { addLogoutListener, removeLogoutListener } from './api/axiosInstance';
 import CoachDetailsScreen from './screens/CoachDetails';
 import LessonBookingScreen from './screens/LessonBooking';
 import CaddieBookingScreen from './screens/CaddieBooking';
@@ -40,6 +41,7 @@ export default function App() {
     loadFonts();
   }, []);
 
+
   useEffect(() => {
     async function loadSession() {
       const accessToken = await getAccessToken();
@@ -47,6 +49,13 @@ export default function App() {
       setAuthChecked(true);
     }
     loadSession();
+
+    // Listen for logout event
+    function handleLogout() {
+      setIsAuthenticated(false);
+    }
+    addLogoutListener(handleLogout);
+    return () => removeLogoutListener(handleLogout);
   }, []);
 
   if (!loaded || !authChecked) return null;

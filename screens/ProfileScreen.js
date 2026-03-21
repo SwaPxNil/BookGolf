@@ -18,6 +18,13 @@ import { useMyProfile, useRefreshToken } from "../hooks/useAuth";
 import { useMyPayments } from "../hooks/usePayment";
 import { useCourseAdmins } from "../hooks/useSuperAdmin";
 import { useAdminLogs } from "../hooks/useAdminLog";
+import { clearAuthTokens } from '../api/tokenStorage';
+import { emitLogout } from '../api/axiosInstance';
+  // Logout handler
+  const handleLogout = async () => {
+    await clearAuthTokens();
+    emitLogout();
+  };
 
 export default function ProfileScreen() {
   const { width, height } = useWindowDimensions();
@@ -198,6 +205,19 @@ export default function ProfileScreen() {
           <Option icon="document-text-outline" title="Privacy policy" />
           <OptionRight icon="people-outline" title="Course Admins" value={`${courseAdmins.length}`} />
           <OptionRight icon="list-outline" title="Admin Logs" value={`${adminLogs.length}`} />
+          {/* Logout Button */}
+          <TouchableOpacity
+            style={{
+              marginTop: 18,
+              backgroundColor: '#7a2a2a',
+              borderRadius: 8,
+              paddingVertical: 12,
+              alignItems: 'center',
+            }}
+            onPress={handleLogout}
+          >
+            <Text style={{ color: '#fff', fontSize: 18, fontFamily: 'Bebas' }}>Logout</Text>
+          </TouchableOpacity>
         </View>
 
         {/* NAVBAR SPACING */}
@@ -208,12 +228,13 @@ export default function ProfileScreen() {
       <Navbar
         currentTab={currentTab}
         onTabPress={handleTabPress}
-        onPressMiddle={() => navigation.navigate("CourseScreen")}
+        onPressMiddle={() => navigation.navigate("ReservationScreen")}
       />
     </SafeAreaView>
   );
 }
 
+/* ---------------------- REUSABLE OPTION COMPONENTS ---------------------- */
 
 const Option = ({ icon, title, onPress }) => (
   <TouchableOpacity
