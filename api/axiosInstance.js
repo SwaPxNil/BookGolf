@@ -6,7 +6,7 @@ import {
   saveAuthTokens,
 } from "./tokenStorage";
 
-const DEFAULT_API_URL = "http://192.168.1.9:5000/api";
+const DEFAULT_API_URL = "http://192.168.1.64:5000/api";
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL;
 
 if (!process.env.EXPO_PUBLIC_API_URL) {
