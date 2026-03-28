@@ -6,9 +6,13 @@ const TeeTimeSchema = new mongoose.Schema({
     type: String,
     default: uuidv4,
   },
+  // course_id: {
+  // type: mongoose.Schema.Types.ObjectId,
+  // ref: "Course",
+  // required: true,
+  // },
   course_id: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "Course",
+  type: String,
   required: true,
   },
   slot_time: {
@@ -17,7 +21,7 @@ const TeeTimeSchema = new mongoose.Schema({
   },
   price: {
     type: Number,
-    // required: [true, 'Please add a price'],
+    required: [true, 'Please add a price'],
   },
   status: {
     type: String,

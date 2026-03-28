@@ -49,8 +49,15 @@ const getTeeTimesForCourse = async (req, res, next) => {
 // @access  Private (USER)
 const bookTeeTime = async (req, res, next) => {
     try {
-        const { teeTimeId } = req.body;
+        const teeTimeId = req.body?.teeTimeId || req.body?.tee_time_id;
         const userId = req.user.id;
+
+        if (!teeTimeId) {
+            return res.status(400).json({
+                success: false,
+                msg: 'teeTimeId is required',
+            });
+        }
         
         const booking = await teeTimeService.bookTeeTime(userId, teeTimeId);
 

@@ -1,4 +1,5 @@
 const paymentService = require('../services/paymentService');
+const bookingPaymentService = require('../services/bookingPaymentService');
 
 // @desc    Get user's payments
 // @route   GET /api/payments/me
@@ -16,6 +17,23 @@ const getUserPayments = async (req, res, next) => {
   }
 };
 
+// @desc    Process advance payment and confirm booking
+// @route   POST /api/payments/bookings/advance
+// @access  Private (USER)
+const processAdvanceBookingPayment = async (req, res, next) => {
+  try {
+    const result = await bookingPaymentService.processAdvanceBookingPayment(req.user, req.body);
+
+    res.status(201).json({
+      success: true,
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getUserPayments,
+  processAdvanceBookingPayment,
 };

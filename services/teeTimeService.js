@@ -50,18 +50,48 @@ const getAvailableTeeTimesByCourse = async (courseId) => {
   );
 };
 
-const bookTeeTime = async (userId, teeTimeId) => {
-    const [templateId, encodedSlot] = String(teeTimeId || '').split('__');
+const parseBookedTeeTimeId = (rawTeeTimeId) => {
+  const normalizedId = String(rawTeeTimeId || '').trim();
+  const separatorIndex = normalizedId.indexOf('__');
 
-    if (!templateId || !encodedSlot) {
+  if (separatorIndex === -1) {
+    return {
+      normalizedId,
+      templateId: normalizedId,
+      slotDate: null,
+      isComposite: false,
+    };
+  }
+
+  const templateId = normalizedId.slice(0, separatorIndex).trim();
+  const encodedSlot = normalizedId.slice(separatorIndex + 2).trim();
+  const decodedSlot = decodeURIComponent(encodedSlot);
+  const slotDate = new Date(decodedSlot);
+
+  return {
+    normalizedId,
+    templateId,
+    slotDate: Number.isNaN(slotDate.getTime()) ? null : slotDate,
+    isComposite: true,
+  };
+};
+
+const bookTeeTime = async (userId, teeTimeId) => {
+    const { normalizedId, templateId, slotDate, isComposite } = parseBookedTeeTimeId(teeTimeId);
+
+    if (!normalizedId) {
+      throw new Error('Tee time id is required');
+    }
+
+    if (!isComposite) {
       const teeTime = await TeeTime.findOneAndUpdate(
-        { _id: teeTimeId, status: 'AVAILABLE' },
+        { _id: normalizedId, status: 'AVAILABLE' },
         { status: 'BOOKED' },
         { new: true }
       );
 
       if (!teeTime) {
-          const existingTeeTime = await TeeTime.findById(teeTimeId);
+          const existingTeeTime = await TeeTime.findById(normalizedId);
           if (!existingTeeTime) {
               throw new Error('Tee time not found');
           }
@@ -73,7 +103,7 @@ const bookTeeTime = async (userId, teeTimeId) => {
           user_id: userId,
           booking_type: 'TEE_TIME',
           course_id: teeTime.course_id,
-          tee_time_id: teeTimeId,
+          tee_time_id: normalizedId,
           slot: teeTime.slot_time,
           status: 'CONFIRMED'
       });
@@ -82,12 +112,15 @@ const bookTeeTime = async (userId, teeTimeId) => {
       return booking;
     }
 
-    const slotDate = new Date(encodedSlot);
-    if (Number.isNaN(slotDate.getTime())) {
+    if (!templateId) {
+      throw new Error('Tee time not found');
+    }
+
+    if (!slotDate) {
       throw new Error('Invalid tee time slot');
     }
 
-    const teeTimeTemplate = await TeeTime.findById(templateId);
+    const teeTimeTemplate = await TeeTime.findOne({ _id: templateId });
     if (!teeTimeTemplate) {
       throw new Error('Tee time not found');
     }
