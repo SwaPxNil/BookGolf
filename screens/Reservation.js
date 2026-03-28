@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -9,11 +9,13 @@ import {
   RefreshControl,
   Dimensions,
   Image,
+  Alert,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
+import { useBookTeeTime, useTeeTimesForCourse } from "../hooks/useTeeTime";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -29,6 +31,29 @@ export default function ReservationScreen({ route }) {
     name: "GOKARNA FOREST RESORT",
     image: require("../assets/images/course1.png"),
   };
+  const courseId = route?.params?.courseId || course?._id || course?.id;
+  const {
+    data: teeTimesResponse,
+    isLoading: teeTimesLoading,
+    refetch: refetchTeeTimes,
+  } = useTeeTimesForCourse(courseId, { retry: false });
+  const bookTeeTimeMutation = useBookTeeTime({
+    onSuccess: () => {
+      Alert.alert("Booking confirmed", "Your tee time has been reserved successfully.");
+      setSelectedSlot("");
+      refetchTeeTimes();
+      navigation.goBack();
+    },
+    onError: (error) => {
+      Alert.alert(
+        "Booking failed",
+        error?.response?.data?.error ||
+          error?.response?.data?.msg ||
+          error?.message ||
+          "Unable to complete the reservation."
+      );
+    },
+  });
 
   const courseImageSource = course?.imageUrl
     ? { uri: course.imageUrl }
@@ -39,33 +64,71 @@ export default function ReservationScreen({ route }) {
     : require("../assets/images/course1.png");
 
   const courseName = course.name;
-  const selectedPrice = "12000";
+  const teeTimes = Array.isArray(teeTimesResponse?.data?.data) ? teeTimesResponse.data.data : [];
 
-  const dates = [
-    { day: "16", label: "Mon", value: "2026-03-16" },
-    { day: "17", label: "Tue", value: "2026-03-17" },
-    { day: "18", label: "Wed", value: "2026-03-18" },
-    { day: "19", label: "Thu", value: "2026-03-19" },
-    { day: "20", label: "Fri", value: "2026-03-20" },
-  ];
+  const formatDateLabel = (isoValue) => {
+    const dt = new Date(isoValue);
+    return {
+      day: String(dt.getDate()).padStart(2, "0"),
+      label: dt.toLocaleDateString("en-US", { weekday: "short" }),
+      value: dt.toISOString().slice(0, 10),
+    };
+  };
 
-  const timeSlots = [
-    { id: 1, slotText: "12:30 - 13:30" },
-    { id: 2, slotText: "13:30 - 14:30" },
-    { id: 3, slotText: "14:30 - 15:30" },
-    { id: 4, slotText: "15:30 - 16:30" },
-    { id: 5, slotText: "16:30 - 17:30" }, 
-  ];
+  const formatTime = (isoValue) => {
+    const dt = new Date(isoValue);
+    return dt.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  };
+
+  const dates = useMemo(() => {
+    const uniqueDateMap = new Map();
+
+    teeTimes.forEach((teeTime) => {
+      const formatted = formatDateLabel(teeTime.slot_time);
+      if (!uniqueDateMap.has(formatted.value)) {
+        uniqueDateMap.set(formatted.value, formatted);
+      }
+    });
+
+    return Array.from(uniqueDateMap.values());
+  }, [teeTimes]);
 
   const activeDateValue = selectedDate || dates[0]?.value || "";
+  const timeSlots = useMemo(() => {
+    return teeTimes
+      .filter((teeTime) => teeTime?.slot_time?.slice(0, 10) === activeDateValue)
+      .map((teeTime) => ({
+        id: teeTime._id,
+        value: teeTime._id,
+        slotText: formatTime(teeTime.slot_time),
+        price: teeTime.price,
+      }));
+  }, [teeTimes, activeDateValue]);
+  const selectedTeeTime = timeSlots.find((slot) => slot.value === selectedSlot);
+  const selectedPrice = String(selectedTeeTime?.price ?? course?.tee_time_price ?? 0);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    setSelectedDate("");
-    setSelectedSlot("");
-    setTimeout(() => {
+    try {
+      setSelectedDate("");
+      setSelectedSlot("");
+      await refetchTeeTimes();
+    } finally {
       setRefreshing(false);
-    }, 400);
+    }
+  };
+
+  const handleBookNow = () => {
+    if (!selectedSlot) {
+      Alert.alert("Select a slot", "Please choose an available tee time first.");
+      return;
+    }
+
+    bookTeeTimeMutation.mutate({ teeTimeId: selectedSlot });
   };
 
   return (
@@ -126,7 +189,10 @@ export default function ReservationScreen({ route }) {
               <TouchableOpacity
                 key={item.value}
                 style={[styles.dateItem, activeDateValue === item.value && styles.dateItemActive]}
-                onPress={() => setSelectedDate(item.value)}
+                onPress={() => {
+                  setSelectedDate(item.value);
+                  setSelectedSlot("");
+                }}
               >
                 <Text style={[styles.dateNumber, activeDateValue === item.value && styles.dateNumberActive]}>
                   {item.day}
@@ -137,6 +203,9 @@ export default function ReservationScreen({ route }) {
               </TouchableOpacity>
             ))}
           </ScrollView>
+          {!teeTimesLoading && dates.length === 0 ? (
+            <Text style={styles.emptyText}>No available tee times for this course.</Text>
+          ) : null}
 
           {/* TIME SELECTION */}
           <View style={styles.sectionHeader}>
@@ -152,15 +221,18 @@ export default function ReservationScreen({ route }) {
             {timeSlots.map((slot) => (
               <TouchableOpacity
                 key={slot.id}
-                style={[styles.timeSlot, selectedSlot === slot.slotText && styles.timeSlotActive]}
-                onPress={() => setSelectedSlot(slot.slotText)}
+                style={[styles.timeSlot, selectedSlot === slot.value && styles.timeSlotActive]}
+                onPress={() => setSelectedSlot(slot.value)}
               >
-                <Text style={[styles.timeText, selectedSlot === slot.slotText && styles.timeTextActive]}>
+                <Text style={[styles.timeText, selectedSlot === slot.value && styles.timeTextActive]}>
                   {slot.slotText}
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
+          {!teeTimesLoading && dates.length > 0 && timeSlots.length === 0 ? (
+            <Text style={styles.emptyText}>No available tee times on the selected date.</Text>
+          ) : null}
           
         </ScrollView>
 
@@ -171,8 +243,17 @@ export default function ReservationScreen({ route }) {
             <Text style={styles.price}>Rs{selectedPrice}</Text>
           </View>
 
-          <TouchableOpacity style={styles.bookBtn}>
-            <Text style={styles.bookText}>BOOK NOW</Text>
+          <TouchableOpacity
+            style={[
+              styles.bookBtn,
+              (!selectedSlot || bookTeeTimeMutation.isPending) && styles.bookBtnDisabled,
+            ]}
+            onPress={handleBookNow}
+            disabled={!selectedSlot || bookTeeTimeMutation.isPending}
+          >
+            <Text style={styles.bookText}>
+              {bookTeeTimeMutation.isPending ? "BOOKING..." : "BOOK NOW"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -336,6 +417,13 @@ const styles = StyleSheet.create({
   timeTextActive: {
     color: COLORS.white,
   },
+  emptyText: {
+    color: "#CCCCCC",
+    fontSize: 14,
+    fontFamily: "Abel",
+    paddingHorizontal: 25,
+    marginBottom: 8,
+  },
 
   footerRow: {
     flexDirection: "row",
@@ -363,6 +451,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingVertical: 12,
     borderRadius: 25,
+  },
+  bookBtnDisabled: {
+    opacity: 0.6,
   },
 
   bookText: {

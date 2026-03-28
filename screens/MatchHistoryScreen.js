@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
 import {
-  Alert,
   View,
   Text,
   StyleSheet,
@@ -17,20 +16,28 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Header from "../components/Header";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import Navbar from "../components/Navbar";
-import { useCalculateHandicap } from "../hooks/useHandicap";
+import { useCalculateHandicap, useHandicapRating } from "../hooks/useHandicap";
 import { useMyProfile } from "../hooks/useAuth";
 import { useMyRounds } from "../hooks/useRound";
+import { useCourses } from "../hooks/useCourse";
 
 export default function MatchHistoryScreen() {
   const { width, height } = useWindowDimensions();
   const [score1, setScore1] = useState("");
   const [score2, setScore2] = useState("");
   const [calculatedHandicap, setCalculatedHandicap] = useState(null);
+  const [showHandicapOverlay, setShowHandicapOverlay] = useState(false);
+  const [selectedCourseName, setSelectedCourseName] = useState("");
+  const [selectedCourseRating, setSelectedCourseRating] = useState(null);
+  const [selectedSlopeRating, setSelectedSlopeRating] = useState(null);
+  const [showCourseOptions, setShowCourseOptions] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
   const [currentTab, setCurrentTab] = useState("match");
   const calculateHandicapMutation = useCalculateHandicap();
+  const handicapRatingMutation = useHandicapRating();
   const { data: profileData } = useMyProfile({ retry: false });
+  const { data: coursesResponse } = useCourses({ retry: false });
   const {
     data: roundsData,
     isLoading: roundsLoading,
@@ -41,6 +48,11 @@ export default function MatchHistoryScreen() {
   const avatarSource = profile?.profile_img
     ? { uri: profile.profile_img }
     : require("../assets/images/Avatar.png");
+  const courses = Array.isArray(coursesResponse?.data?.data)
+    ? coursesResponse.data.data
+    : Array.isArray(coursesResponse?.data)
+    ? coursesResponse.data
+    : [];
 
   const handleTabPress = (tab) => navigation.navigate(tab);
 
@@ -58,6 +70,27 @@ export default function MatchHistoryScreen() {
     : [];
 
   const recentRounds = rounds.slice(0, 4);
+
+  const handleSelectCourse = async (courseName) => {
+    setSelectedCourseName(courseName);
+    setShowCourseOptions(false);
+    setCalculatedHandicap(null);
+
+    try {
+      const response = await handicapRatingMutation.mutateAsync(courseName);
+      const ratingData = response?.data?.data ?? response?.data ?? {};
+      setSelectedCourseRating(ratingData?.course_rating ?? null);
+      setSelectedSlopeRating(ratingData?.slope_rating ?? null);
+    } catch (error) {
+      setSelectedCourseRating(null);
+      setSelectedSlopeRating(null);
+      const message =
+        error?.response?.data?.error ||
+        error?.response?.data?.msg ||
+        "Could not fetch course ratings right now.";
+      Alert.alert("Course lookup failed", String(message));
+    }
+  };
 
   const formatRoundDate = (round) => {
     const rawDate = round?.round_date || round?.played_at || round?.date;
@@ -84,8 +117,8 @@ export default function MatchHistoryScreen() {
   };
 
   const handleCalculateHandicap = async () => {
-    if (!score1 || !score2) {
-      Alert.alert("Missing scores", "Please enter both recent scores.");
+    if (!score1 || !score2 || !selectedCourseName) {
+      Alert.alert("Missing details", "Please enter both scores and select a course.");
       return;
     }
 
@@ -93,13 +126,16 @@ export default function MatchHistoryScreen() {
       const response = await calculateHandicapMutation.mutateAsync({
         recent_score_1: Number(score1),
         recent_score_2: Number(score2),
-        course_id: 1,
+        course_name: selectedCourseName,
       });
       const handicap =
         response?.data?.data?.handicap ??
         response?.data?.handicap ??
         response?.data?.calculated_handicap;
-      setCalculatedHandicap(handicap ?? null);
+      const formattedHandicap =
+        typeof handicap === "number" ? handicap.toFixed(1) : Number(handicap).toFixed(1);
+      setCalculatedHandicap(formattedHandicap);
+      setShowHandicapOverlay(true);
     } catch (error) {
       const message =
         error?.response?.data?.message || "Could not calculate handicap right now.";
@@ -110,6 +146,7 @@ export default function MatchHistoryScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
+      setShowCourseOptions(false);
       await refetchRounds();
     } finally {
       setRefreshing(false);
@@ -118,6 +155,22 @@ export default function MatchHistoryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {showHandicapOverlay ? (
+        <View style={styles.overlayBackdrop}>
+          <View style={styles.overlayCard}>
+            <Text style={styles.overlayEyebrow}>HANDICAP RESULT</Text>
+            <Text style={styles.overlayValue}>{calculatedHandicap}</Text>
+            <Text style={styles.overlayCourse}>{selectedCourseName}</Text>
+            <TouchableOpacity
+              style={styles.overlayButton}
+              onPress={() => setShowHandicapOverlay(false)}
+            >
+              <Text style={styles.overlayButtonText}>CLOSE</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
       <TouchableOpacity
         style={[
           styles.profileContainer,
@@ -164,17 +217,50 @@ export default function MatchHistoryScreen() {
             />
           </View>
 
-          <View style={styles.row}>
-            <TouchableOpacity style={[styles.dropdown, { width: "48%", padding: width * 0.03 }]}>
-              <Text style={styles.dropdownText}>Slope Rating</Text>
+          <View style={styles.coursePickerBlock}>
+            <TouchableOpacity
+              style={[styles.dropdown, { padding: width * 0.03 }]}
+              onPress={() => setShowCourseOptions((prev) => !prev)}
+            >
+              <Text style={styles.dropdownText}>
+                {selectedCourseName || "Select Course Name"}
+              </Text>
               <Feather name="chevron-down" size={18} color="#ccc" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.dropdown, { width: "48%", padding: width * 0.03 }]}>
-              <Text style={styles.dropdownText}>Course Rating</Text>
-              <Feather name="chevron-down" size={18} color="#ccc" />
-            </TouchableOpacity>
+            {showCourseOptions ? (
+              <View style={styles.dropdownMenu}>
+                <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                  {courses.map((course, index) => {
+                    const courseName = course?.name ?? course?.course_name ?? "";
+                    return (
+                      <TouchableOpacity
+                        key={`${course?._id ?? courseName}-${index}`}
+                        style={styles.dropdownItem}
+                        onPress={() => handleSelectCourse(courseName)}
+                      >
+                        <Text style={styles.dropdownItemText}>{courseName}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {courses.length === 0 ? (
+                    <Text style={styles.dropdownEmpty}>No courses available.</Text>
+                  ) : null}
+                </ScrollView>
+              </View>
+            ) : null}
           </View>
+
+          {selectedCourseName ? (
+            <View style={styles.ratingInfoBox}>
+              <Text style={styles.ratingInfoText}>
+                Course Rating: {selectedCourseRating ?? "--"}
+              </Text>
+              <Text style={styles.ratingInfoText}>
+                Slope Rating: {selectedSlopeRating ?? "--"}
+              </Text>
+            </View>
+          ) : null}
 
           <TouchableOpacity
             style={[styles.calculateBtn, { paddingVertical: width * 0.035, borderRadius: width * 0.05 }]}
@@ -185,9 +271,6 @@ export default function MatchHistoryScreen() {
               {calculateHandicapMutation.isPending ? "CALCULATING..." : "CALCULATE"}
             </Text>
           </TouchableOpacity>
-          {calculatedHandicap !== null && (
-            <Text style={styles.handicapResult}>Calculated handicap: {calculatedHandicap}</Text>
-          )}
         </View>
 
         <Text style={[styles.recentTitle, { fontSize: width * 0.06, marginHorizontal: width * 0.055, marginTop: height * 0.03 }]}> 
@@ -245,6 +328,67 @@ const COLORS = {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
+  overlayBackdrop: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: "rgba(20, 24, 21, 0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 30,
+    paddingHorizontal: 24,
+  },
+  overlayCard: {
+    width: "100%",
+    maxWidth: 340,
+    backgroundColor: COLORS.cardDark,
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    borderWidth: 1,
+    borderColor: "#51614f",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  overlayEyebrow: {
+    color: "#B8C59C",
+    fontFamily: "Bebas",
+    fontSize: 22,
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+  overlayValue: {
+    color: "#fff",
+    fontFamily: "Bebas",
+    fontSize: 64,
+    lineHeight: 68,
+  },
+  overlayCourse: {
+    color: "#D6D2C7",
+    fontFamily: "Abel",
+    fontSize: 18,
+    textAlign: "center",
+    marginTop: 8,
+  },
+  overlayButton: {
+    marginTop: 24,
+    backgroundColor: COLORS.greenButton,
+    borderRadius: 16,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+  },
+  overlayButtonText: {
+    color: "#fff",
+    fontFamily: "Bebas",
+    fontSize: 22,
+    letterSpacing: 1,
+  },
 
   profileContainer: {
     position: "absolute",
@@ -295,8 +439,51 @@ const styles = StyleSheet.create({
     fontFamily: "Abel",
     color: "#fff",
   },
+  coursePickerBlock: {
+    marginBottom: 12,
+  },
+  dropdownMenu: {
+    backgroundColor: "#2D3A33",
+    borderRadius: 10,
+    marginTop: 8,
+    maxHeight: 180,
+    borderWidth: 1,
+    borderColor: "#405046",
+  },
+  dropdownScroll: {
+    maxHeight: 180,
+  },
+  dropdownItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#405046",
+  },
+  dropdownItemText: {
+    color: "#fff",
+    fontFamily: "Abel",
+    fontSize: 15,
+  },
+  dropdownEmpty: {
+    color: "#ccc",
+    fontFamily: "Abel",
+    fontSize: 14,
+    padding: 14,
+  },
 
   dropdownText: { color: "#ccc" },
+  ratingInfoBox: {
+    backgroundColor: "#2D3A33",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  ratingInfoText: {
+    color: "#fff",
+    fontFamily: "Abel",
+    fontSize: 15,
+  },
 
   calculateBtn: {
     marginTop: 18,

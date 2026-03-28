@@ -71,12 +71,14 @@ export default function HomeScreen() {
   const avatarSource = profile?.profile_img
     ? { uri: profile.profile_img }
     : require("../assets/images/Avatar.png");
+  const isAdmin = profile?.role === "COURSE_ADMIN" || profile?.role === "SUPER_ADMIN";
   const rounds = Array.isArray(roundsData?.data?.data)
     ? roundsData.data.data
     : Array.isArray(roundsData?.data)
     ? roundsData.data
     : [];
   const recentRounds = rounds.slice(0, 3);
+  const recentBookings = Array.isArray(dashboard?.recentBookings) ? dashboard.recentBookings.slice(0, 5) : [];
   const dashboardSubtitle =
     dashboard?.summary_text ||
     dashboard?.message ||
@@ -143,17 +145,45 @@ export default function HomeScreen() {
           </Text>
 
           <Text style={[styles.sectionTitle, { fontSize: width * 0.06, marginTop: height * 0.05 }]}>
-            RECENT LESSONS
+            {isAdmin ? "RECENT BOOKINGS" : "RECENT LESSONS"}
           </Text>
 
           <View style={[styles.lessonCard, { borderRadius: width * 0.07 }]}>
-            {recentRounds.map((round, index) => (
-              <View key={`${round?.id ?? round?._id ?? index}`} style={styles.lessonRow}>
-                <Text style={styles.lessonText}>{round?.date || round?.played_at || "Round"}</Text>
-                <Text style={styles.lessonScore}>{round?.score ?? round?.total_score ?? "-"}</Text>
-              </View>
-            ))}
-            {recentRounds.length === 0 ? (
+            {isAdmin
+              ? recentBookings.map((booking, index) => {
+                  const subjectName =
+                    booking?.booking_type === "TEE_TIME"
+                      ? booking?.course_id?.name || "Course tee time"
+                      : booking?.booking_type === "COACH"
+                      ? booking?.coach_id?.full_name || "Coach lesson"
+                      : booking?.caddie_id?.full_name || "Caddie booking";
+
+                  return (
+                    <View key={`${booking?._id ?? index}`} style={styles.lessonRow}>
+                      <View style={styles.lessonTextBlock}>
+                        <Text style={styles.lessonText}>
+                          {booking?.user_id?.full_name || "User"} - {subjectName}
+                        </Text>
+                        <Text style={styles.lessonMeta}>
+                          {(booking?.booking_type || "").replace("_", " ")} - {booking?.status || "CONFIRMED"}
+                        </Text>
+                      </View>
+                      <Text style={styles.lessonScore}>
+                        {booking?.slot ? new Date(booking.slot).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "-"}
+                      </Text>
+                    </View>
+                  );
+                })
+              : recentRounds.map((round, index) => (
+                  <View key={`${round?.id ?? round?._id ?? index}`} style={styles.lessonRow}>
+                    <Text style={styles.lessonText}>{round?.date || round?.played_at || "Round"}</Text>
+                    <Text style={styles.lessonScore}>{round?.score ?? round?.total_score ?? "-"}</Text>
+                  </View>
+                ))}
+            {isAdmin && recentBookings.length === 0 ? (
+              <Text style={styles.lessonEmpty}>No recent bookings found.</Text>
+            ) : null}
+            {!isAdmin && recentRounds.length === 0 ? (
               <Text style={styles.lessonEmpty}>No recent rounds found.</Text>
             ) : null}
           </View>
@@ -237,6 +267,16 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Abel",
     fontSize: 16,
+  },
+  lessonTextBlock: {
+    flex: 1,
+    marginRight: 12,
+  },
+  lessonMeta: {
+    color: "#d7d7d7",
+    fontFamily: "Abel",
+    fontSize: 13,
+    marginTop: 2,
   },
   lessonScore: {
     color: "#d5e4b2",

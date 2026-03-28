@@ -10,12 +10,14 @@ import {
   Animated,
   RefreshControl,
   Image,
+  Alert,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useCaddie, useCaddieAvailability } from "../hooks/useCaddie";
+import { useBookCaddie } from "../hooks/useCaddie";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -36,6 +38,23 @@ export default function CaddieBookingScreen() {
     isLoading: availabilityLoading,
     refetch: refetchAvailability,
   } = useCaddieAvailability(caddieId, { retry: false });
+  const bookCaddieMutation = useBookCaddie({
+    onSuccess: () => {
+      Alert.alert("Booking confirmed", "Your caddie reservation has been booked successfully.");
+      setSelectedSlot("");
+      refetchAvailability();
+      navigation.goBack();
+    },
+    onError: (error) => {
+      Alert.alert(
+        "Booking failed",
+        error?.response?.data?.error ||
+          error?.response?.data?.msg ||
+          error?.message ||
+          "Unable to complete the booking."
+      );
+    },
+  });
 
   const caddieData = caddieResponse?.data?.data || {};
   const caddie = {
@@ -151,6 +170,23 @@ export default function CaddieBookingScreen() {
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const handleBookNow = () => {
+    if (!caddieId) {
+      Alert.alert("Booking unavailable", "Caddie details are incomplete.");
+      return;
+    }
+
+    if (!selectedSlot) {
+      Alert.alert("Select a slot", "Please choose an available time slot first.");
+      return;
+    }
+
+    bookCaddieMutation.mutate({
+      caddieId,
+      slot: selectedSlot,
+    });
   };
 
   return (
@@ -275,7 +311,10 @@ export default function CaddieBookingScreen() {
             {dates.map((item) => {
               const isActive = activeDateValue === item.value;
               return (
-                <TouchableOpacity key={item.value} style={[styles.dateItem, isActive && styles.dateItemActive]} onPress={() => setSelectedDate(item.value)}>
+                <TouchableOpacity key={item.value} style={[styles.dateItem, isActive && styles.dateItemActive]} onPress={() => {
+                  setSelectedDate(item.value);
+                  setSelectedSlot("");
+                }}>
                   <Text style={[styles.dateNumber, isActive && styles.dateNumberActive]}>{item.day}</Text>
                   <Text style={[styles.dateLabel, isActive && styles.dateLabelActive]}>{item.label}</Text>
                 </TouchableOpacity>
@@ -311,8 +350,17 @@ export default function CaddieBookingScreen() {
             <Text style={styles.costLabel}>Cost:</Text>
             <Text style={styles.costValue}> RS{service.price}</Text>
           </View>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionBtnText}>BOOK NOW</Text>
+          <TouchableOpacity
+            style={[
+              styles.actionBtn,
+              (!selectedSlot || bookCaddieMutation.isPending) && styles.actionBtnDisabled,
+            ]}
+            onPress={handleBookNow}
+            disabled={!selectedSlot || bookCaddieMutation.isPending}
+          >
+            <Text style={styles.actionBtnText}>
+              {bookCaddieMutation.isPending ? "BOOKING..." : "BOOK NOW"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -450,6 +498,9 @@ nextBtnContainer: {
     paddingHorizontal: 30,
     paddingVertical: 12,
     borderRadius: 25,
+  },
+  actionBtnDisabled: {
+    opacity: 0.6,
   },
 
   actionBtnText: {

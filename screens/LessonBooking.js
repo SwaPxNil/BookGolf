@@ -10,12 +10,14 @@ import {
   Animated,
   RefreshControl,
   Image,
+  Alert,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useCoachAvailability } from "../hooks/useCoach";
+import { useBookCoachLesson } from "../hooks/useCoach";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -31,6 +33,23 @@ export default function LessonBookingScreen() {
     isLoading: availabilityLoading,
     refetch: refetchAvailability,
   } = useCoachAvailability(coachId, { retry: false });
+  const bookCoachLessonMutation = useBookCoachLesson({
+    onSuccess: () => {
+      Alert.alert("Booking confirmed", "Your coach lesson has been booked successfully.");
+      setSelectedSlot("");
+      refetchAvailability();
+      navigation.goBack();
+    },
+    onError: (error) => {
+      Alert.alert(
+        "Booking failed",
+        error?.response?.data?.error ||
+          error?.response?.data?.msg ||
+          error?.message ||
+          "Unable to complete the booking."
+      );
+    },
+  });
   
   const coach = route?.params?.coach || {
     name: "RAMESH KARKI",
@@ -153,6 +172,26 @@ export default function LessonBookingScreen() {
     }
   };
 
+  const handleBookNow = () => {
+    const resolvedLessonId = lesson?.lessonId || lesson?.id || lesson?._id;
+
+    if (!coachId || !resolvedLessonId) {
+      Alert.alert("Booking unavailable", "Coach lesson details are incomplete.");
+      return;
+    }
+
+    if (!selectedSlot) {
+      Alert.alert("Select a slot", "Please choose an available time slot first.");
+      return;
+    }
+
+    bookCoachLessonMutation.mutate({
+      coachId,
+      lessonId: resolvedLessonId,
+      slot: selectedSlot,
+    });
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -259,7 +298,10 @@ export default function LessonBookingScreen() {
             {dates.map((item) => {
               const isActive = activeDateValue === item.value;
               return (
-                <TouchableOpacity key={item.value} style={[styles.dateItem, isActive && styles.dateItemActive]} onPress={() => setSelectedDate(item.value)}>
+                <TouchableOpacity key={item.value} style={[styles.dateItem, isActive && styles.dateItemActive]} onPress={() => {
+                  setSelectedDate(item.value);
+                  setSelectedSlot("");
+                }}>
                   <Text style={[styles.dateNumber, isActive && styles.dateNumberActive]}>{item.day}</Text>
                   <Text style={[styles.dateLabel, isActive && styles.dateLabelActive]}>{item.label}</Text>
                 </TouchableOpacity>
@@ -297,8 +339,17 @@ export default function LessonBookingScreen() {
             <Text style={styles.costLabel}>Cost:</Text>
             <Text style={styles.costValue}> RS{lesson.price}</Text>
           </View>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionBtnText}>BOOK NOW</Text>
+          <TouchableOpacity
+            style={[
+              styles.actionBtn,
+              (!selectedSlot || bookCoachLessonMutation.isPending) && styles.actionBtnDisabled,
+            ]}
+            onPress={handleBookNow}
+            disabled={!selectedSlot || bookCoachLessonMutation.isPending}
+          >
+            <Text style={styles.actionBtnText}>
+              {bookCoachLessonMutation.isPending ? "BOOKING..." : "BOOK NOW"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -443,6 +494,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingVertical: 12,
     borderRadius: 25,
+  },
+  actionBtnDisabled: {
+    opacity: 0.6,
   },
 
   actionBtnText: {
