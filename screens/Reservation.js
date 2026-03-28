@@ -15,7 +15,9 @@ import { StatusBar } from "expo-status-bar";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { useBookTeeTime, useTeeTimesForCourse } from "../hooks/useTeeTime";
+import BookingPaymentModal from "../components/BookingPaymentModal";
+import { useTeeTimesForCourse } from "../hooks/useTeeTime";
+import { useProcessAdvanceBookingPayment } from "../hooks/usePayment";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -26,6 +28,9 @@ export default function ReservationScreen({ route }) {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [confirmationVisible, setConfirmationVisible] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("ESEWA");
   
   const course = route?.params?.course || {
     name: "GOKARNA FOREST RESORT",
@@ -37,12 +42,11 @@ export default function ReservationScreen({ route }) {
     isLoading: teeTimesLoading,
     refetch: refetchTeeTimes,
   } = useTeeTimesForCourse(courseId, { retry: false });
-  const bookTeeTimeMutation = useBookTeeTime({
+  const processBookingPaymentMutation = useProcessAdvanceBookingPayment({
     onSuccess: () => {
-      Alert.alert("Booking confirmed", "Your tee time has been reserved successfully.");
+      setPaymentModalVisible(false);
+      setConfirmationVisible(true);
       setSelectedSlot("");
-      refetchTeeTimes();
-      navigation.goBack();
     },
     onError: (error) => {
       Alert.alert(
@@ -110,6 +114,8 @@ export default function ReservationScreen({ route }) {
   }, [teeTimes, activeDateValue]);
   const selectedTeeTime = timeSlots.find((slot) => slot.value === selectedSlot);
   const selectedPrice = String(selectedTeeTime?.price ?? course?.tee_time_price ?? 0);
+  const totalAmount = Number(selectedTeeTime?.price ?? course?.tee_time_price ?? 0);
+  const advanceAmount = Number((totalAmount / 3).toFixed(2));
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -128,7 +134,22 @@ export default function ReservationScreen({ route }) {
       return;
     }
 
-    bookTeeTimeMutation.mutate({ teeTimeId: selectedSlot });
+    setPaymentMethod("ESEWA");
+    setPaymentModalVisible(true);
+  };
+
+  const handleConfirmPayment = () => {
+    processBookingPaymentMutation.mutate({
+      bookingType: "TEE_TIME",
+      paymentMethod,
+      teeTimeId: selectedSlot,
+    });
+  };
+
+  const handleConfirmationClose = async () => {
+    setConfirmationVisible(false);
+    await refetchTeeTimes();
+    navigation.goBack();
   };
 
   return (
@@ -246,18 +267,38 @@ export default function ReservationScreen({ route }) {
           <TouchableOpacity
             style={[
               styles.bookBtn,
-              (!selectedSlot || bookTeeTimeMutation.isPending) && styles.bookBtnDisabled,
+              (!selectedSlot || processBookingPaymentMutation.isPending) && styles.bookBtnDisabled,
             ]}
             onPress={handleBookNow}
-            disabled={!selectedSlot || bookTeeTimeMutation.isPending}
+            disabled={!selectedSlot || processBookingPaymentMutation.isPending}
           >
             <Text style={styles.bookText}>
-              {bookTeeTimeMutation.isPending ? "BOOKING..." : "BOOK NOW"}
+              {processBookingPaymentMutation.isPending ? "BOOKING..." : "BOOK NOW"}
             </Text>
           </TouchableOpacity>
         </View>
 
       </View>
+
+      <BookingPaymentModal
+        visible={paymentModalVisible}
+        mode="payment"
+        serviceLabel="Tee Time Advance"
+        totalAmount={totalAmount}
+        advanceAmount={advanceAmount}
+        paymentMethod={paymentMethod}
+        onSelectMethod={setPaymentMethod}
+        onConfirm={handleConfirmPayment}
+        onClose={() => setPaymentModalVisible(false)}
+        isSubmitting={processBookingPaymentMutation.isPending}
+      />
+
+      <BookingPaymentModal
+        visible={confirmationVisible}
+        mode="success"
+        serviceLabel="Tee Time Advance"
+        onClose={handleConfirmationClose}
+      />
     </View>
   );
 }

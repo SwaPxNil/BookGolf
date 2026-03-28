@@ -17,7 +17,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useCoachAvailability } from "../hooks/useCoach";
-import { useBookCoachLesson } from "../hooks/useCoach";
+import BookingPaymentModal from "../components/BookingPaymentModal";
+import { useProcessAdvanceBookingPayment } from "../hooks/usePayment";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -33,12 +34,11 @@ export default function LessonBookingScreen() {
     isLoading: availabilityLoading,
     refetch: refetchAvailability,
   } = useCoachAvailability(coachId, { retry: false });
-  const bookCoachLessonMutation = useBookCoachLesson({
+  const bookCoachLessonMutation = useProcessAdvanceBookingPayment({
     onSuccess: () => {
-      Alert.alert("Booking confirmed", "Your coach lesson has been booked successfully.");
+      setPaymentModalVisible(false);
+      setConfirmationVisible(true);
       setSelectedSlot("");
-      refetchAvailability();
-      navigation.goBack();
     },
     onError: (error) => {
       Alert.alert(
@@ -78,6 +78,9 @@ export default function LessonBookingScreen() {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [confirmationVisible, setConfirmationVisible] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("ESEWA");
 
   const animState = useRef(new Animated.Value(0)).current;
 
@@ -162,6 +165,8 @@ export default function LessonBookingScreen() {
   }, [availabilitySlots, activeDateValue]);
 
   const isLoadingBookingData = Boolean(coachId) && availabilityLoading;
+  const totalAmount = Number(lesson?.price ?? 0);
+  const advanceAmount = Number((totalAmount / 3).toFixed(2));
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -185,11 +190,26 @@ export default function LessonBookingScreen() {
       return;
     }
 
+    setPaymentMethod("ESEWA");
+    setPaymentModalVisible(true);
+  };
+
+  const handleConfirmPayment = () => {
+    const resolvedLessonId = lesson?.lessonId || lesson?.id || lesson?._id;
+
     bookCoachLessonMutation.mutate({
+      bookingType: "COACH",
+      paymentMethod,
       coachId,
       lessonId: resolvedLessonId,
       slot: selectedSlot,
     });
+  };
+
+  const handleConfirmationClose = async () => {
+    setConfirmationVisible(false);
+    await refetchAvailability();
+    navigation.goBack();
   };
 
   return (
@@ -354,6 +374,26 @@ export default function LessonBookingScreen() {
         </View>
 
       </Animated.View>
+
+      <BookingPaymentModal
+        visible={paymentModalVisible}
+        mode="payment"
+        serviceLabel="Coach Lesson Advance"
+        totalAmount={totalAmount}
+        advanceAmount={advanceAmount}
+        paymentMethod={paymentMethod}
+        onSelectMethod={setPaymentMethod}
+        onConfirm={handleConfirmPayment}
+        onClose={() => setPaymentModalVisible(false)}
+        isSubmitting={bookCoachLessonMutation.isPending}
+      />
+
+      <BookingPaymentModal
+        visible={confirmationVisible}
+        mode="success"
+        serviceLabel="Coach Lesson Advance"
+        onClose={handleConfirmationClose}
+      />
     </View>
   );
 }

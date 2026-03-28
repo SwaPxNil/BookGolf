@@ -17,7 +17,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useCaddie, useCaddieAvailability } from "../hooks/useCaddie";
-import { useBookCaddie } from "../hooks/useCaddie";
+import BookingPaymentModal from "../components/BookingPaymentModal";
+import { useProcessAdvanceBookingPayment } from "../hooks/usePayment";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -38,12 +39,11 @@ export default function CaddieBookingScreen() {
     isLoading: availabilityLoading,
     refetch: refetchAvailability,
   } = useCaddieAvailability(caddieId, { retry: false });
-  const bookCaddieMutation = useBookCaddie({
+  const bookCaddieMutation = useProcessAdvanceBookingPayment({
     onSuccess: () => {
-      Alert.alert("Booking confirmed", "Your caddie reservation has been booked successfully.");
+      setPaymentModalVisible(false);
+      setConfirmationVisible(true);
       setSelectedSlot("");
-      refetchAvailability();
-      navigation.goBack();
     },
     onError: (error) => {
       Alert.alert(
@@ -79,6 +79,9 @@ export default function CaddieBookingScreen() {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [confirmationVisible, setConfirmationVisible] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("ESEWA");
 
   const animState = useRef(new Animated.Value(0)).current;
 
@@ -162,6 +165,8 @@ export default function CaddieBookingScreen() {
   }, [availabilitySlots, activeDateValue]);
 
   const isLoadingBookingData = Boolean(caddieId) && (caddieLoading || availabilityLoading);
+  const totalAmount = Number(service?.price ?? 0);
+  const advanceAmount = Number((totalAmount / 3).toFixed(2));
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -183,10 +188,24 @@ export default function CaddieBookingScreen() {
       return;
     }
 
+    setPaymentMethod("ESEWA");
+    setPaymentModalVisible(true);
+  };
+
+  const handleConfirmPayment = () => {
     bookCaddieMutation.mutate({
+      bookingType: "CADDIE",
+      paymentMethod,
       caddieId,
       slot: selectedSlot,
+      totalAmount,
     });
+  };
+
+  const handleConfirmationClose = async () => {
+    setConfirmationVisible(false);
+    await Promise.all([refetchCaddie(), refetchAvailability()]);
+    navigation.goBack();
   };
 
   return (
@@ -365,6 +384,26 @@ export default function CaddieBookingScreen() {
         </View>
 
       </Animated.View>
+
+      <BookingPaymentModal
+        visible={paymentModalVisible}
+        mode="payment"
+        serviceLabel="Caddie Advance"
+        totalAmount={totalAmount}
+        advanceAmount={advanceAmount}
+        paymentMethod={paymentMethod}
+        onSelectMethod={setPaymentMethod}
+        onConfirm={handleConfirmPayment}
+        onClose={() => setPaymentModalVisible(false)}
+        isSubmitting={bookCaddieMutation.isPending}
+      />
+
+      <BookingPaymentModal
+        visible={confirmationVisible}
+        mode="success"
+        serviceLabel="Caddie Advance"
+        onClose={handleConfirmationClose}
+      />
     </View>
   );
 }

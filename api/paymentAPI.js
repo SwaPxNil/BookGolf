@@ -4,3 +4,7 @@ import { authAxios } from "./axiosInstance";
 export const getMyPayments = () => {
   return authAxios.get("/payments/me");
 };
+
+export const processAdvanceBookingPayment = (payload) => {
+  return authAxios.post("/payments/bookings/advance", payload);
+};
