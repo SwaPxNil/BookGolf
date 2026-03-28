@@ -5,14 +5,14 @@ const handicapService = require('../services/handicapService');
 // @access  Private (USER)
 const calculateHandicap = async (req, res, next) => {
   try {
-    const { recent_score_1, recent_score_2, course_id } = req.body;
+    const { recent_score_1, recent_score_2, course_name } = req.body;
     const userId = req.user.id;
 
     const result = await handicapService.calculateHandicap(
       userId,
       recent_score_1,
       recent_score_2,
-      course_id
+      course_name
     );
     
     res.status(200).json({

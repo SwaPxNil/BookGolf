@@ -46,6 +46,7 @@ app.use('/api/handicap', require('./routes/handicap'));
 app.use('/api/admin-logs', require('./routes/adminLog'));
 app.use('/api/super-admin', require('./routes/superAdmin'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/handicap-rating', require('./routes/handicapRating'));
 
 
 

@@ -1,8 +1,14 @@
 const Handicap = require('../models/Handicap');
 const Course = require('../models/Course');
 
-const calculateHandicap = async (userId, recentScore1, recentScore2, courseId) => {
-  const course = await Course.findById(courseId);
+const calculateHandicap = async (userId, recentScore1, recentScore2, courseName) => {
+  const normalizedCourseName = String(courseName || '').trim();
+  const escapedName = normalizedCourseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const course = await Course.findOne({
+    name: { $regex: `^${escapedName}$`, $options: 'i' },
+  });
+
   if (!course) {
     throw new Error('Course not found');
   }
@@ -14,13 +20,13 @@ const calculateHandicap = async (userId, recentScore1, recentScore2, courseId) =
 
   const newHandicap = await Handicap.create({
     user_id: userId,
-    course_id: courseId,
+    course_id: course._id,
     handicap_value: handicapValue,
   });
 
   return {
     course_name: course.name,
-    handicap_value: newHandicap.handicap_value,
+    handicap: newHandicap.handicap_value,
   };
 };
 

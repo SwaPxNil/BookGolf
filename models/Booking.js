@@ -53,6 +53,9 @@ const BookingSchema = new mongoose.Schema({
       return this.booking_type === 'CADDIE';
     },
   },
+  slot: {
+    type: Date,
+  },
   status: {
     type: String,
     enum: ['CONFIRMED', 'CANCELLED'],

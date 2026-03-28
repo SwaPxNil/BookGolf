@@ -57,6 +57,42 @@ const getCourse = async (req, res, next) => {
   }
 };
 
+// @desc    Get course handicap rating by course name
+// @route   GET /api/handicap-rating?name=Royal Nepal Golf Club
+// @access  Public
+const getHandicapRating = async (req, res, next) => {
+  try {
+    const { name } = req.query;
+
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({
+        success: false,
+        msg: 'Please provide a course name using the name query parameter',
+      });
+    }
+
+    const course = await courseService.getCourseHandicapRatingByName(name);
+
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        msg: 'Course not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        name: course.name,
+        course_rating: course.course_rating,
+        slope_rating: course.slope_rating,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Update a course
 // @route   PUT /api/courses/:id
 // @access  Private (COURSE_ADMIN or SUPER_ADMIN)
@@ -123,6 +159,7 @@ module.exports = {
   createCourse,
   getCourses,
   getCourse,
+  getHandicapRating,
   updateCourse,
   deleteCourse,
   updateCourseStatus,

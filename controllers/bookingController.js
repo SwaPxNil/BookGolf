@@ -16,6 +16,23 @@ const getUserBookings = async (req, res, next) => {
   }
 };
 
+// @desc    Get all bookings
+// @route   GET /api/bookings
+// @access  Private (COURSE_ADMIN, SUPER_ADMIN)
+const getAllBookings = async (req, res, next) => {
+  try {
+    const bookings = await bookingService.getAllBookings();
+    res.status(200).json({
+      success: true,
+      count: bookings.length,
+      data: bookings,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getUserBookings,
+  getAllBookings,
 };

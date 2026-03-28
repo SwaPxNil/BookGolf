@@ -1,5 +1,6 @@
 const Caddie = require('../models/Caddie');
 const Booking = require('../models/Booking');
+const { generateRecurringSlots, slotMatchesTemplate } = require('../utils/recurringAvailability');
 
 const normalizeCaddieData = (data = {}) => {
   const normalized = { ...data };
@@ -79,7 +80,27 @@ const deleteCaddie = async (caddieId) => {
 
 const getCaddieAvailability = async (caddieId) => {
     const caddie = await Caddie.findById(caddieId);
-    return caddie ? caddie.availability_slots : null;
+    if (!caddie) {
+      return null;
+    }
+
+    const allRecurringSlots = generateRecurringSlots(caddie.availability_slots);
+    const confirmedBookings = await Booking.find({
+      booking_type: 'CADDIE',
+      caddie_id: caddieId,
+      status: 'CONFIRMED',
+      slot: { $gte: new Date() },
+    }).select('slot');
+
+    const bookedSlotSet = new Set(
+      confirmedBookings
+        .map((booking) => booking?.slot ? new Date(booking.slot).toISOString() : null)
+        .filter(Boolean)
+    );
+
+    return allRecurringSlots
+      .filter((slot) => !bookedSlotSet.has(slot.toISOString()))
+      .map((slot) => slot.toISOString());
 };
 
 const bookCaddie = async (userId, caddieId, slot) => {
@@ -88,25 +109,38 @@ const bookCaddie = async (userId, caddieId, slot) => {
         throw new Error('Caddie not found');
     }
 
-    const slotIndex = caddie.availability_slots.findIndex(s => new Date(s).toISOString() === new Date(slot).toISOString());
-    if(slotIndex === -1) {
+    const slotDate = new Date(slot);
+    if (Number.isNaN(slotDate.getTime())) {
+        throw new Error('Invalid booking slot');
+    }
+
+    if (!slotMatchesTemplate(slotDate, caddie.availability_slots)) {
         throw new Error('Caddie not available for the selected slot');
     }
     
-    // Remove the booked slot
-    caddie.availability_slots.splice(slotIndex, 1);
-    await caddie.save();
+    const existingBooking = await Booking.findOne({
+      booking_type: 'CADDIE',
+      caddie_id: caddieId,
+      slot: slotDate,
+      status: 'CONFIRMED',
+    });
+
+    if (existingBooking) {
+      throw new Error('Caddie not available for the selected slot');
+    }
     
     const booking = new Booking({
         user_id: userId,
         booking_type: 'CADDIE',
         caddie_id: caddieId,
+        slot: slotDate,
         status: 'CONFIRMED',
     });
 
     await booking.save();
 
-    const updatedCaddie = await syncCaddieMatches(caddie);
+    const latestCaddie = await Caddie.findById(caddieId);
+    const updatedCaddie = latestCaddie ? await syncCaddieMatches(latestCaddie) : null;
     const bookingResponse = booking.toObject();
     bookingResponse.caddie = updatedCaddie;
 
@@ -137,9 +171,6 @@ const cancelCaddieBooking = async (bookingId, userId) => {
 
     const caddie = await Caddie.findById(booking.caddie_id);
     const syncedCaddie = caddie ? await syncCaddieMatches(caddie) : null;
-
-    // Make the caddie available again for the slot, if we stored the slot in the booking
-    // For now, we are not re-adding the slot to the caddie's availability
     
     const bookingResponse = booking.toObject();
     bookingResponse.caddie = syncedCaddie;

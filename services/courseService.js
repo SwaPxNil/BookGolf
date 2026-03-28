@@ -15,6 +15,21 @@ const getCourseById = async (courseId) => {
   return course;
 };
 
+const getCourseHandicapRatingByName = async (courseName) => {
+  const normalizedName = String(courseName || '').trim();
+  if (!normalizedName) {
+    return null;
+  }
+
+  const escapedName = normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const course = await Course.findOne({
+    name: { $regex: `^${escapedName}$`, $options: 'i' },
+  }).select('name course_rating slope_rating');
+
+  return course;
+};
+
 const updateCourse = async (courseId, courseData) => {
   const course = await Course.findByIdAndUpdate(courseId, courseData, {
     new: true,
@@ -35,6 +50,7 @@ module.exports = {
   createCourse,
   getCourses,
   getCourseById,
+  getCourseHandicapRatingByName,
   updateCourse,
   deleteCourse,
 };

@@ -1,5 +1,6 @@
 const Coach = require('../models/Coach');
 const Booking = require('../models/Booking');
+const { generateRecurringSlots, slotMatchesTemplate } = require('../utils/recurringAvailability');
 
 const getConfirmedCoachBookingCount = async (coachId) => {
   const confirmedCount = await Booking.countDocuments({
@@ -111,7 +112,27 @@ const getCoachLessons = async (coachId) => {
 
 const getCoachAvailability = async (coachId) => {
   const coach = await Coach.findById(coachId);
-  return coach ? coach.availability_slots : null;
+  if (!coach) {
+    return null;
+  }
+
+  const allRecurringSlots = generateRecurringSlots(coach.availability_slots);
+  const confirmedBookings = await Booking.find({
+    booking_type: 'COACH',
+    coach_id: coachId,
+    status: 'CONFIRMED',
+    slot: { $gte: new Date() },
+  }).select('slot');
+
+  const bookedSlotSet = new Set(
+    confirmedBookings
+      .map((booking) => booking?.slot ? new Date(booking.slot).toISOString() : null)
+      .filter(Boolean)
+  );
+
+  return allRecurringSlots
+    .filter((slot) => !bookedSlotSet.has(slot.toISOString()))
+    .map((slot) => slot.toISOString());
 };
 
 const bookCoachLesson = async (userId, coachId, lessonId, slot) => {
@@ -126,13 +147,24 @@ const bookCoachLesson = async (userId, coachId, lessonId, slot) => {
   }
 
   const slotDate = new Date(slot);
-  const slotIndex = coach.availability_slots.findIndex(s => s.getTime() === slotDate.getTime());
-  if (slotIndex === -1) {
+  if (Number.isNaN(slotDate.getTime())) {
+    throw new Error('Invalid booking slot');
+  }
+
+  if (!slotMatchesTemplate(slotDate, coach.availability_slots)) {
     throw new Error('Coach not available at this slot');
   }
 
-  coach.availability_slots.splice(slotIndex, 1);
-  await coach.save();
+  const existingBooking = await Booking.findOne({
+    booking_type: 'COACH',
+    coach_id: coachId,
+    slot: slotDate,
+    status: 'CONFIRMED',
+  });
+
+  if (existingBooking) {
+    throw new Error('Coach not available at this slot');
+  }
 
   const booking = new Booking({
     user_id: userId,
@@ -145,9 +177,10 @@ const bookCoachLesson = async (userId, coachId, lessonId, slot) => {
 
   await booking.save();
 
-  coach.students_taught = (coach.students_taught || 0) + 1;
-  coach.recommendation_value = Coach.calculateRecommendationValue(coach.rating, coach.students_taught);
-  await coach.save();
+  const updatedCoach = await Coach.findById(coachId);
+  if (updatedCoach) {
+    await syncCoachMetrics(updatedCoach);
+  }
 
   return booking;
 };
@@ -167,18 +200,12 @@ const cancelCoachLessonBooking = async (bookingId, userId) => {
       return booking;
     }
     
-    // Add the slot back to coach's availability
-    const coach = await Coach.findById(booking.coach_id);
-    if (coach && booking.slot) {
-        coach.availability_slots.push(booking.slot);
-        await coach.save();
-    }
-
     booking.status = 'CANCELLED';
     await booking.save();
 
-    if (coach) {
-      await syncCoachMetrics(coach);
+    const updatedCoach = await Coach.findById(booking.coach_id);
+    if (updatedCoach) {
+      await syncCoachMetrics(updatedCoach);
     }
 
     return booking;
