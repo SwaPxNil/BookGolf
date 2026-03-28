@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Abel&family=Bebas+Neue&display=swap");
+
+body {
+  font-family: "Abel", ui-sans-serif, system-ui, sans-serif;
+  color: #1e211c;
+  background:
+    radial-gradient(circle at top left, rgba(243, 216, 122, 0.38), transparent 24%),
+    radial-gradient(circle at top right, rgba(121, 141, 61, 0.22), transparent 22%),
+    linear-gradient(180deg, #e8e1cf 0%, #ddd1bb 52%, #d6c8af 100%);
+}
+
+#root {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 231, 0.2) 0%, rgba(214, 200, 175, 0.08) 100%);
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Bebas Neue", sans-serif;
+    letter-spacing: 0.04em;
+  }
+}
+
+@layer utilities {
+  .font-bebas {
+    font-family: "Bebas Neue", sans-serif;
+    letter-spacing: 0.06em;
+  }
+
+  .font-abel {
+    font-family: "Abel", sans-serif;
+  }
+}
