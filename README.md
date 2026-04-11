@@ -119,6 +119,120 @@ The server will start on the port specified in your `.env` file (default: 3000).
 
 (This section will be populated with a Postman collection export)
 
+### Super Admin + Frontend Compatibility Updates
+
+#### Create Course Admin
+
+- Method: `POST`
+- Path: `/api/super-admin/course-admins`
+- Access: `SUPER_ADMIN`
+
+Request body:
+
+```json
+{
+	"full_name": "Course Admin One",
+	"email": "courseadmin1@example.com",
+	"password": "secret123"
+}
+```
+
+Response:
+
+```json
+{
+	"success": true,
+	"data": {
+		"_id": "user-uuid",
+		"full_name": "Course Admin One",
+		"email": "courseadmin1@example.com",
+		"role": "COURSE_ADMIN",
+		"status": "ACTIVE",
+		"profile_img": null
+	}
+}
+```
+
+#### Update Course Admin Status
+
+- Method: `PATCH`
+- Path: `/api/super-admin/course-admins/:id/status`
+- Access: `SUPER_ADMIN`
+
+Request body:
+
+```json
+{
+	"status": "INACTIVE"
+}
+```
+
+Fallback endpoints:
+
+- `PATCH /api/super-admin/course-admins/:id/activate`
+- `PATCH /api/super-admin/course-admins/:id/deactivate`
+
+Response shape is the same as create.
+
+#### Course Assignment / Unassignment
+
+- Method: `PUT`
+- Path: `/api/courses/:id`
+- Access: `COURSE_ADMIN`, `SUPER_ADMIN`
+- Assignment fields (`created_by`, `course_admin_id`) can be changed only by `SUPER_ADMIN`.
+
+Accepted payload examples:
+
+```json
+{
+	"course_admin_id": "course-admin-user-id"
+}
+```
+
+```json
+{
+	"created_by": null
+}
+```
+
+Course responses include `created_by`. If populated, it contains `_id`, `full_name`, and `email`.
+
+#### Coach Lesson Persistence via Coach Update
+
+- Method: `PUT`
+- Path: `/api/coaches/:id`
+- Access: `COURSE_ADMIN`
+
+`lessons` in payload supports create, edit, and delete by replacement:
+
+```json
+{
+	"lessons": [
+		{
+			"_id": "existing-lesson-id",
+			"title": "Short Game Fundamentals",
+			"duration_minutes": 60,
+			"price": 1200
+		},
+		{
+			"title": "Putting Basics",
+			"duration_minutes": 45,
+			"price": 900
+		}
+	]
+}
+```
+
+Use `GET /api/coaches/:id/lessons` to fetch the updated lesson values.
+
+#### Dashboard Compatibility Fields
+
+`GET /api/dashboard` returns booking and revenue totals in all supported frontend shapes:
+
+- `total_revenue`, `total_bookings`
+- `totals.revenue`, `totals.bookings`
+- `revenue`, `bookings`
+
 ## Roles
 
 -   **USER**: Standard user, can book tee times, coaches, caddies, view their rounds and payments, calculate handicap.

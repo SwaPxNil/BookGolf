@@ -4,6 +4,7 @@ const {
   createCourse,
   getCourses,
   getCourse,
+  getMyCourse,
   updateCourse,
   deleteCourse,
 } = require('../controllers/courseController');
@@ -27,6 +28,10 @@ router
     validate(createCourseSchema),
     createCourse
   );
+
+router
+  .route('/me')
+  .get(authenticate, authorize('COURSE_ADMIN', 'SUPER_ADMIN'), getMyCourse);
 
 router
   .route('/:id')

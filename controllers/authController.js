@@ -1,4 +1,9 @@
 const User = require('../models/User');
+const Booking = require('../models/Booking');
+const Payment = require('../models/Payment');
+const Round = require('../models/Round');
+const Handicap = require('../models/Handicap');
+const AdminLog = require('../models/AdminLog');
 const { hashPassword, comparePassword, generateToken, verifyToken } = require('../utils/auth');
 const { generateSecret, verifyToken: verify2FAToken, sendTwoFactorEmail } = require('../utils/twoFactorAuth');
 const { uploadImageBuffer } = require('../utils/cloudinaryUpload');
@@ -9,7 +14,7 @@ const { v4: uuidv4 } = require('uuid');
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
-    const { full_name, email, password, role } = req.body;
+    const { full_name, email, password, role} = req.body;
 
     // Check existing user
     const existingUser = await User.findOne({ email });
@@ -26,7 +31,7 @@ exports.register = async (req, res, next) => {
       full_name,
       email,
       password_hash,
-      role,
+      role: role || 'USER',
     });
 
     // Generate 2FA secret
@@ -75,6 +80,10 @@ exports.login = async (req, res, next) => {
       return res.status(401).json({ success: false, msg: 'Invalid credentials' });
     }
 
+    if (user.status === 'INACTIVE') {
+      return res.status(403).json({ success: false, msg: 'Your account is inactive. Please contact support.' });
+    }
+
     // Check if password matches
     const isMatch = await comparePassword(password, user.password_hash);
     if (!isMatch) {
@@ -109,6 +118,64 @@ exports.login = async (req, res, next) => {
   }
 };
 
+// @desc    Admin dashboard direct login (no 2FA step)
+// @route   POST /api/auth/dashboard-login
+// @access  Public
+exports.dashboardLogin = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email }).select('+password_hash');
+    if (!user) {
+      return res.status(401).json({ success: false, msg: 'Invalid credentials' });
+    }
+
+    if (user.status === 'INACTIVE') {
+      return res.status(403).json({ success: false, msg: 'Your account is inactive. Please contact support.' });
+    }
+
+    const isMatch = await comparePassword(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, msg: 'Invalid credentials' });
+    }
+
+    if (!['COURSE_ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
+      return res.status(403).json({ success: false, msg: 'Only admin users can use dashboard login' });
+    }
+
+    const directLoginEnabled = String(process.env.DASHBOARD_DIRECT_LOGIN_ENABLED || 'true').toLowerCase() === 'true';
+    if (!directLoginEnabled) {
+      return res.status(403).json({
+        success: false,
+        msg: 'Dashboard direct login is disabled',
+      });
+    }
+
+    const accessToken = generateToken(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      process.env.JWT_ACCESS_TOKEN_EXPIRATION
+    );
+    const refreshToken = generateToken(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      process.env.JWT_REFRESH_TOKEN_EXPIRATION
+    );
+
+    const safeUser = await User.findById(user._id).select('-password_hash -two_factor_secret -two_factor_code');
+
+    res.status(200).json({
+      success: true,
+      msg: 'Dashboard login successful',
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      data: safeUser,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Verify 2FA
 // @route   POST /api/auth/verify-2fa
 // @access  Public
@@ -128,6 +195,10 @@ exports.verify2FA = async (req, res, next) => {
         const user = await User.findById(decoded.id).select('+two_factor_secret +two_factor_code +two_factor_code_expires');
         if (!user) {
             return res.status(404).json({ success: false, msg: 'User not found' });
+        }
+
+        if (user.status === 'INACTIVE') {
+          return res.status(403).json({ success: false, msg: 'Your account is inactive. Please contact support.' });
         }
 
         if (user.two_factor_code !== two_factor_code || user.two_factor_code_expires < Date.now()) {
@@ -313,6 +384,42 @@ exports.updateUserProfile = async (req, res, next) => {
       success: true,
       msg: 'Profile updated successfully',
       data: safeUser,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Delete current logged in user account
+// @route   DELETE /api/auth/me
+// @access  Private
+exports.deleteUserAccount = async (req, res, next) => {
+  try {
+    const { current_password } = req.body;
+
+    const user = await User.findById(req.user.id).select('+password_hash');
+    if (!user) {
+      return res.status(404).json({ success: false, msg: 'User not found' });
+    }
+
+    const isMatch = await comparePassword(current_password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, msg: 'Current password is incorrect' });
+    }
+
+    await Promise.all([
+      Booking.deleteMany({ user_id: user._id }),
+      Payment.deleteMany({ user_id: user._id }),
+      Round.deleteMany({ user_id: user._id }),
+      Handicap.deleteMany({ user_id: user._id }),
+      AdminLog.deleteMany({ actor_id: user._id }),
+    ]);
+
+    await user.deleteOne();
+
+    return res.status(200).json({
+      success: true,
+      msg: 'Account deleted successfully',
     });
   } catch (err) {
     next(err);

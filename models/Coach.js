@@ -84,6 +84,14 @@ const CoachSchema = new mongoose.Schema({
     min: [0, 'Recommendation value cannot be negative'],
     default: 0,
   },
+  course_id: {
+    type: String,
+    ref: 'Course',
+  },
+  created_by: {
+    type: String,
+    ref: 'User',
+  },
   lessons: [LessonSchema],
 });
 

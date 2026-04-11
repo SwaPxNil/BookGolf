@@ -15,8 +15,17 @@ const getRoundById = async (roundId) => {
     return round;
 };
 
+const updateRoundScorecard = async (roundId, scorecardData) => {
+    const round = await Round.findByIdAndUpdate(roundId, scorecardData, {
+        new: true,
+        runValidators: true,
+    }).populate('course_id');
+    return round;
+};
+
 module.exports = {
   createRound,
   getUserRounds,
   getRoundById,
+  updateRoundScorecard,
 };

@@ -2,6 +2,37 @@ const Caddie = require('../models/Caddie');
 const Booking = require('../models/Booking');
 const { generateRecurringSlots, slotMatchesTemplate } = require('../utils/recurringAvailability');
 
+const normalizeAvailabilitySlots = (slots) => {
+  if (!Array.isArray(slots)) {
+    return slots;
+  }
+
+  return slots
+    .map((slot) => {
+      if (typeof slot === 'string' || slot instanceof Date) {
+        return new Date(slot);
+      }
+
+      if (slot && typeof slot === 'object') {
+        const candidate =
+          slot.dateTime
+          || slot.datetime
+          || slot.slot
+          || slot.value
+          || slot.start
+          || slot.start_time
+          || slot.iso;
+
+        if (candidate) {
+          return new Date(candidate);
+        }
+      }
+
+      return null;
+    })
+    .filter((date) => date && !Number.isNaN(date.getTime()));
+};
+
 const normalizeCaddieData = (data = {}) => {
   const normalized = { ...data };
 
@@ -15,6 +46,10 @@ const normalizeCaddieData = (data = {}) => {
 
   if (typeof normalized.experience_years === 'number' && typeof normalized.experience !== 'number') {
     normalized.experience = normalized.experience_years;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(normalized, 'availability_slots')) {
+    normalized.availability_slots = normalizeAvailabilitySlots(normalized.availability_slots);
   }
 
   return normalized;
@@ -50,8 +85,18 @@ const createCaddie = async (caddieData) => {
   return caddie;
 };
 
-const getCaddies = async () => {
-  return Caddie.find();
+const getCaddies = async (filters = {}) => {
+  const query = {};
+
+  if (filters.createdBy) {
+    query.created_by = filters.createdBy;
+  }
+
+  if (filters.courseId) {
+    query.course_id = filters.courseId;
+  }
+
+  return Caddie.find(query);
 };
 
 const getCaddieById = async (caddieId) => {
@@ -71,11 +116,8 @@ const updateCaddie = async (caddieId, caddieData) => {
 };
 
 const deleteCaddie = async (caddieId) => {
-  const caddie = await Caddie.findById(caddieId);
-  if (caddie) {
-    await caddie.remove();
-  }
-  return caddie;
+  const caddie = await Caddie.findByIdAndDelete(caddieId);
+  return caddie || null;
 };
 
 const getCaddieAvailability = async (caddieId) => {

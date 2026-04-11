@@ -57,6 +57,34 @@ const getCourse = async (req, res, next) => {
   }
 };
 
+// @desc    Get current course admin course
+// @route   GET /api/courses/me
+// @access  Private (COURSE_ADMIN, SUPER_ADMIN)
+const getMyCourse = async (req, res, next) => {
+  try {
+    if (req.user.role === 'SUPER_ADMIN') {
+      const courses = await courseService.getCourses();
+      return res.status(200).json({
+        success: true,
+        count: courses.length,
+        data: courses,
+      });
+    }
+
+    const course = await courseService.getCourseByCreator(req.user.id);
+    if (!course) {
+      return res.status(404).json({ success: false, msg: 'No course found for this admin' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: course,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Get course handicap rating by course name
 // @route   GET /api/handicap-rating?name=Royal Nepal Golf Club
 // @access  Public
@@ -99,6 +127,16 @@ const getHandicapRating = async (req, res, next) => {
 const updateCourse = async (req, res, next) => {
   try {
     const courseData = { ...req.body };
+    const wantsAdminAssignmentUpdate =
+      Object.prototype.hasOwnProperty.call(courseData, 'created_by') ||
+      Object.prototype.hasOwnProperty.call(courseData, 'course_admin_id');
+
+    if (wantsAdminAssignmentUpdate && req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({
+        success: false,
+        msg: 'Only SUPER_ADMIN can assign or unassign course admins',
+      });
+    }
 
     if (req.file) {
       const uploadResult = await uploadImageBuffer(req.file, 'courses');
@@ -159,6 +197,7 @@ module.exports = {
   createCourse,
   getCourses,
   getCourse,
+  getMyCourse,
   getHandicapRating,
   updateCourse,
   deleteCourse,

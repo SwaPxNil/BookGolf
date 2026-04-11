@@ -11,19 +11,19 @@ const {
   bookCoachLesson,
   cancelCoachLessonBooking,
 } = require('../controllers/coachController');
-const { authenticate, authorize } = require('../middlewares/auth');
+const { authenticate, optionalAuthenticate, authorize } = require('../middlewares/auth');
 const { uploadSingleImage, parseJsonFields } = require('../middlewares/upload');
 const validate = require('../middlewares/validator');
 const { createCoachSchema, updateCoachSchema } = require('../utils/validators/coach.validator');
 
 router
   .route('/')
-  .get(getCoaches)
+  .get(optionalAuthenticate, getCoaches)
   .post(
     authenticate,
     authorize('COURSE_ADMIN'),
     uploadSingleImage('image'),
-    parseJsonFields(['availability_slots', 'lessons']),
+    parseJsonFields(['availability_slots', 'availabilitySlots', 'lessons']),
     validate(createCoachSchema),
     createCoach
   );
@@ -33,13 +33,13 @@ router
   .get(getCoach)
   .put(
     authenticate,
-    authorize('COURSE_ADMIN'),
+    authorize('COURSE_ADMIN', 'SUPER_ADMIN'),
     uploadSingleImage('image'),
-    parseJsonFields(['availability_slots', 'lessons']),
+    parseJsonFields(['availability_slots', 'availabilitySlots', 'lessons']),
     validate(updateCoachSchema),
     updateCoach
   )
-  .delete(authenticate, authorize('COURSE_ADMIN'), deleteCoach);
+  .delete(authenticate, authorize('COURSE_ADMIN', 'SUPER_ADMIN'), deleteCoach);
 
 router.route('/:id/lessons').get(getCoachLessons);
 router.route('/:id/availability').get(getCoachAvailability);

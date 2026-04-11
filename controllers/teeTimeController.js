@@ -28,12 +28,29 @@ const createTeeTime = async (req, res, next) => {
 // @access  Public
 const getTeeTimesForCourse = async (req, res, next) => {
     try {
-        const course = await courseService.getCourseById(req.params.courseId);
-        if(!course) {
-            return res.status(404).json({ success: false, msg: 'Course not found' });
+    const requestedCourseId = req.params.courseId || req.query.courseId;
+
+    if (!requestedCourseId) {
+      const filters = {};
+
+      if (req.query.status) {
+        filters.status = req.query.status;
+      }
+
+      const teeTimes = await teeTimeService.getTeeTimes(filters);
+      return res.status(200).json({
+        success: true,
+        count: teeTimes.length,
+        data: teeTimes,
+      });
         }
+
+    const course = await courseService.getCourseById(requestedCourseId);
+    if(!course) {
+      return res.status(404).json({ success: false, msg: 'Course not found' });
+    }
         
-        const teeTimes = await teeTimeService.getAvailableTeeTimesByCourse(req.params.courseId);
+    const teeTimes = await teeTimeService.getAvailableTeeTimesByCourse(requestedCourseId);
         res.status(200).json({
             success: true,
             count: teeTimes.length,
@@ -49,7 +66,12 @@ const getTeeTimesForCourse = async (req, res, next) => {
 // @access  Private (USER)
 const bookTeeTime = async (req, res, next) => {
     try {
-        const teeTimeId = req.body?.teeTimeId || req.body?.tee_time_id;
+        const teeTimeId = req.body?.teeTimeId 
+          || req.body?.tee_time_id
+          || req.body?.template_id
+          || req.body?.templateId
+          || req.body?.id
+          || req.body?._id;
         const userId = req.user.id;
 
         if (!teeTimeId) {
@@ -59,7 +81,10 @@ const bookTeeTime = async (req, res, next) => {
             });
         }
         
-        const booking = await teeTimeService.bookTeeTime(userId, teeTimeId);
+        const booking = await teeTimeService.bookTeeTime(userId, {
+          teeTimeId,
+          slot: req.body?.slot || req.body?.slot_time,
+        });
 
         res.status(201).json({
             success: true,
@@ -70,8 +95,96 @@ const bookTeeTime = async (req, res, next) => {
     }
 };
 
+// @desc    Update tee time
+// @route   PUT /api/tee-times/:id
+// @access  Private (COURSE_ADMIN, SUPER_ADMIN)
+const updateTeeTime = async (req, res, next) => {
+  try {
+    const teeTime = await teeTimeService.updateTeeTime(req.params.id, req.body, req.user);
+    if (!teeTime) {
+      return res.status(404).json({ success: false, msg: 'Tee time not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: teeTime,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Delete tee time
+// @route   DELETE /api/tee-times/:id
+// @access  Private (COURSE_ADMIN, SUPER_ADMIN)
+const deleteTeeTime = async (req, res, next) => {
+  try {
+    const teeTime = await teeTimeService.deleteTeeTime(req.params.id, req.user);
+    if (!teeTime) {
+      return res.status(404).json({ success: false, msg: 'Tee time not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {},
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get tee times for current course admin courses
+// @route   GET /api/course-admin/tee-times
+// @access  Private (COURSE_ADMIN, SUPER_ADMIN)
+const getCourseAdminTeeTimes = async (req, res, next) => {
+  try {
+    if (req.user.role === 'SUPER_ADMIN') {
+      const filters = {};
+      if (req.query.courseId) {
+        filters.courseId = req.query.courseId;
+      }
+      if (req.query.status) {
+        filters.status = req.query.status;
+      }
+
+      const teeTimes = await teeTimeService.getTeeTimes(filters);
+      return res.status(200).json({
+        success: true,
+        count: teeTimes.length,
+        data: teeTimes,
+      });
+    }
+
+    const courses = await courseService.getCoursesByCreator(req.user.id);
+    const courseIds = courses.map((course) => String(course._id));
+
+    if (!courseIds.length) {
+      return res.status(200).json({ success: true, count: 0, data: [] });
+    }
+
+    const allTeeTimes = await Promise.all(
+      courseIds.map((courseId) => teeTimeService.getTeeTimes({
+        courseId,
+        status: req.query.status,
+      }))
+    );
+
+    const teeTimes = allTeeTimes.flat();
+    res.status(200).json({
+      success: true,
+      count: teeTimes.length,
+      data: teeTimes,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   createTeeTime,
   getTeeTimesForCourse,
-  bookTeeTime
+  bookTeeTime,
+  updateTeeTime,
+  deleteTeeTime,
+  getCourseAdminTeeTimes,
 };

@@ -1,5 +1,18 @@
 const coachService = require('../services/coachService');
 const { uploadImageBuffer } = require('../utils/cloudinaryUpload');
+const courseService = require('../services/courseService');
+
+const sanitizeCoachUpdatePayload = (payload = {}) => {
+  const sanitized = { ...payload };
+
+  Object.keys(sanitized).forEach((key) => {
+    if (sanitized[key] === '' || sanitized[key] === null) {
+      delete sanitized[key];
+    }
+  });
+
+  return sanitized;
+};
 
 // @desc    Create a coach
 // @route   POST /api/coaches
@@ -7,6 +20,21 @@ const { uploadImageBuffer } = require('../utils/cloudinaryUpload');
 const createCoach = async (req, res, next) => {
   try {
     const coachData = { ...req.body };
+
+    if (typeof coachData.availability_slots === 'undefined' && typeof coachData.availabilitySlots !== 'undefined') {
+      coachData.availability_slots = coachData.availabilitySlots;
+    }
+
+    if (req.user?.id) {
+      coachData.created_by = req.user.id;
+    }
+
+    if (!coachData.course_id && req.user?.role === 'COURSE_ADMIN') {
+      const myCourse = await courseService.getCourseByCreator(req.user.id);
+      if (myCourse) {
+        coachData.course_id = myCourse._id;
+      }
+    }
 
     if (req.file) {
       const uploadResult = await uploadImageBuffer(req.file, 'coaches');
@@ -28,7 +56,21 @@ const createCoach = async (req, res, next) => {
 // @access  Public
 const getCoaches = async (req, res, next) => {
   try {
-    const coaches = await coachService.getCoaches();
+    let filters = {};
+
+    if (String(req.query.mine || '').toLowerCase() === 'true') {
+      if (!req.user) {
+        return res.status(401).json({ success: false, msg: 'Not authorized to access this route' });
+      }
+
+      filters.createdBy = req.user.id;
+
+      if (req.query.courseId) {
+        filters.courseId = req.query.courseId;
+      }
+    }
+
+    const coaches = await coachService.getCoaches(filters);
     res.status(200).json({
       success: true,
       count: coaches.length,
@@ -62,7 +104,11 @@ const getCoach = async (req, res, next) => {
 // @access  Private (COURSE_ADMIN)
 const updateCoach = async (req, res, next) => {
   try {
-    const coachData = { ...req.body };
+    const coachData = sanitizeCoachUpdatePayload({ ...req.body });
+
+    if (typeof coachData.availability_slots === 'undefined' && typeof coachData.availabilitySlots !== 'undefined') {
+      coachData.availability_slots = coachData.availabilitySlots;
+    }
 
     if (req.file) {
       const uploadResult = await uploadImageBuffer(req.file, 'coaches');

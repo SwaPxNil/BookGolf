@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
 const TeeTime = require('../models/TeeTime');
+const mongoose = require('mongoose');
 const Coach = require('../models/Coach');
 const Caddie = require('../models/Caddie');
 const Course = require('../models/Course');
@@ -15,13 +16,38 @@ const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 
 const getAdvanceAmount = (totalAmount) => roundMoney(Number(totalAmount || 0) / 3);
 
+const findTeeTimeByIdFlexible = async (id) => {
+  const normalizedId = String(id || '').trim();
+
+  if (!normalizedId) {
+    return null;
+  }
+
+  const byModelId = await TeeTime.findById(normalizedId);
+  if (byModelId) {
+    return byModelId;
+  }
+
+  if (mongoose.Types.ObjectId.isValid(normalizedId)) {
+    const byObjectId = await TeeTime.collection.findOne({
+      _id: new mongoose.Types.ObjectId(normalizedId),
+    });
+
+    if (byObjectId) {
+      return byObjectId;
+    }
+  }
+
+  return null;
+};
+
 const resolveTeeTimeDetails = async (teeTimeId) => {
   const normalizedId = String(teeTimeId || '').trim();
   const separatorIndex = normalizedId.indexOf('__');
   const templateId = separatorIndex === -1 ? normalizedId : normalizedId.slice(0, separatorIndex);
   const slotValue = separatorIndex === -1 ? null : decodeURIComponent(normalizedId.slice(separatorIndex + 2));
 
-  const teeTime = await TeeTime.findById(templateId);
+  const teeTime = await findTeeTimeByIdFlexible(templateId);
   if (!teeTime) {
     throw new Error('Tee time not found');
   }

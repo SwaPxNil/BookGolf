@@ -37,6 +37,11 @@ const UserSchema = new mongoose.Schema({
     enum: ['USER', 'COURSE_ADMIN', 'SUPER_ADMIN'],
     default: 'USER',
   },
+  status: {
+    type: String,
+    enum: ['ACTIVE', 'INACTIVE'],
+    default: 'ACTIVE',
+  },
   is_2fa_verified: {
     type: Boolean,
     default: false,

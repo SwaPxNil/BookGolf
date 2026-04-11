@@ -1,5 +1,6 @@
 const caddieService = require('../services/caddieService');
 const { uploadImageBuffer } = require('../utils/cloudinaryUpload');
+const courseService = require('../services/courseService');
 
 // @desc    Create a caddie
 // @route   POST /api/caddies
@@ -7,6 +8,21 @@ const { uploadImageBuffer } = require('../utils/cloudinaryUpload');
 const createCaddie = async (req, res, next) => {
   try {
     const caddieData = { ...req.body };
+
+    if (typeof caddieData.availability_slots === 'undefined' && typeof caddieData.availabilitySlots !== 'undefined') {
+      caddieData.availability_slots = caddieData.availabilitySlots;
+    }
+
+    if (req.user?.id) {
+      caddieData.created_by = req.user.id;
+    }
+
+    if (!caddieData.course_id && req.user?.role === 'COURSE_ADMIN') {
+      const myCourse = await courseService.getCourseByCreator(req.user.id);
+      if (myCourse) {
+        caddieData.course_id = myCourse._id;
+      }
+    }
 
     if (req.file) {
       const uploadResult = await uploadImageBuffer(req.file, 'caddies');
@@ -28,7 +44,21 @@ const createCaddie = async (req, res, next) => {
 // @access  Public
 const getCaddies = async (req, res, next) => {
   try {
-    const caddies = await caddieService.getCaddies();
+    let filters = {};
+
+    if (String(req.query.mine || '').toLowerCase() === 'true') {
+      if (!req.user) {
+        return res.status(401).json({ success: false, msg: 'Not authorized to access this route' });
+      }
+
+      filters.createdBy = req.user.id;
+
+      if (req.query.courseId) {
+        filters.courseId = req.query.courseId;
+      }
+    }
+
+    const caddies = await caddieService.getCaddies(filters);
     res.status(200).json({
       success: true,
       count: caddies.length,
@@ -63,6 +93,10 @@ const getCaddie = async (req, res, next) => {
 const updateCaddie = async (req, res, next) => {
   try {
     const caddieData = { ...req.body };
+
+    if (typeof caddieData.availability_slots === 'undefined' && typeof caddieData.availabilitySlots !== 'undefined') {
+      caddieData.availability_slots = caddieData.availabilitySlots;
+    }
 
     if (req.file) {
       const uploadResult = await uploadImageBuffer(req.file, 'caddies');

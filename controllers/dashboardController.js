@@ -1,5 +1,6 @@
 const Booking = require('../models/Booking');
 const Round = require('../models/Round');
+const Payment = require('../models/Payment');
 const bookingService = require('../services/bookingService');
 
 // @desc    Get dashboard data
@@ -9,6 +10,16 @@ exports.getDashboardData = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const isAdmin = req.user.role === 'COURSE_ADMIN' || req.user.role === 'SUPER_ADMIN';
+
+    const [bookingCount, revenueAgg] = await Promise.all([
+      Booking.countDocuments({ status: 'CONFIRMED' }),
+      Payment.aggregate([
+        { $match: { status: 'PAID' } },
+        { $group: { _id: null, revenue: { $sum: '$total_amount' } } },
+      ]),
+    ]);
+
+    const totalRevenue = revenueAgg?.[0]?.revenue || 0;
 
     if (isAdmin) {
       const recentBookings = await bookingService.getAllBookings({ limit: 10 });
@@ -47,6 +58,14 @@ exports.getDashboardData = async (req, res, next) => {
           summary_text: 'Recent booking activity across tee times, coach lessons, and caddie reservations.',
           recentBookings,
           bookingStats,
+          total_revenue: totalRevenue,
+          total_bookings: bookingCount,
+          totals: {
+            revenue: totalRevenue,
+            bookings: bookingCount,
+          },
+          revenue: totalRevenue,
+          bookings: bookingCount,
         },
       });
     }
@@ -79,6 +98,14 @@ exports.getDashboardData = async (req, res, next) => {
         summary_text: 'Your latest lessons and rounds in one place.',
         recentLessons,
         recentCoursesPlayed,
+        total_revenue: totalRevenue,
+        total_bookings: bookingCount,
+        totals: {
+          revenue: totalRevenue,
+          bookings: bookingCount,
+        },
+        revenue: totalRevenue,
+        bookings: bookingCount,
       },
     });
   } catch (err) {

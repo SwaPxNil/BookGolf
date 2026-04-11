@@ -24,6 +24,10 @@ const RoundSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Please add a total score'],
   },
+  hole_scores: {
+    type: [Number],
+    default: [],
+  },
 });
 
 module.exports = mongoose.model('Round', RoundSchema);

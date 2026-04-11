@@ -53,7 +53,7 @@ const CourseSchema = new mongoose.Schema({
   created_by: {
     type: String,
     ref: 'User',
-    required: [true, 'Please add a user ID for who created the course'],
+    default: null,
   },
   created_at: {
     type: Date,

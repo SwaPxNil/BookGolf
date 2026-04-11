@@ -46,7 +46,15 @@ const CaddieSchema = new mongoose.Schema({
   },
   speciality: {
     type: String,
-  }
+  },
+  course_id: {
+    type: String,
+    ref: 'Course',
+  },
+  created_by: {
+    type: String,
+    ref: 'User',
+  },
 });
 
 CaddieSchema.pre('validate', function(next) {

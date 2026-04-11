@@ -2,6 +2,70 @@ const Coach = require('../models/Coach');
 const Booking = require('../models/Booking');
 const { generateRecurringSlots, slotMatchesTemplate } = require('../utils/recurringAvailability');
 
+const normalizeLessons = (lessons) => {
+  if (!Array.isArray(lessons)) {
+    return lessons;
+  }
+
+  return lessons.map((lesson) => {
+    const resolvedDuration =
+      typeof lesson.duration_minutes !== 'undefined'
+        ? lesson.duration_minutes
+        : lesson.durationMinutes;
+
+    const numericDuration = Number(resolvedDuration);
+    const numericPrice = Number(lesson.price);
+    const normalizedTitle = typeof lesson.title === 'string' ? lesson.title.trim() : '';
+
+    if (!normalizedTitle || Number.isNaN(numericDuration) || numericDuration <= 0 || Number.isNaN(numericPrice) || numericPrice <= 0) {
+      return null;
+    }
+
+    const normalized = {
+      title: normalizedTitle,
+      duration_minutes: numericDuration,
+      price: numericPrice,
+    };
+
+    if (typeof lesson._id === 'string' && lesson._id.trim()) {
+      normalized._id = lesson._id.trim();
+    }
+
+    return normalized;
+  }).filter(Boolean);
+};
+
+const normalizeAvailabilitySlots = (slots) => {
+  if (!Array.isArray(slots)) {
+    return slots;
+  }
+
+  return slots
+    .map((slot) => {
+      if (typeof slot === 'string' || slot instanceof Date) {
+        return new Date(slot);
+      }
+
+      if (slot && typeof slot === 'object') {
+        const candidate =
+          slot.dateTime
+          || slot.datetime
+          || slot.slot
+          || slot.value
+          || slot.start
+          || slot.start_time
+          || slot.iso;
+
+        if (candidate) {
+          return new Date(candidate);
+        }
+      }
+
+      return null;
+    })
+    .filter((date) => date && !Number.isNaN(date.getTime()));
+};
+
 const getConfirmedCoachBookingCount = async (coachId) => {
   const confirmedCount = await Booking.countDocuments({
     booking_type: 'COACH',
@@ -30,12 +94,30 @@ const createCoach = async (coachData) => {
     coachData.profile_img = coachData.image_url;
   }
 
+  if (Object.prototype.hasOwnProperty.call(coachData, 'lessons')) {
+    coachData.lessons = normalizeLessons(coachData.lessons);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(coachData, 'availability_slots')) {
+    coachData.availability_slots = normalizeAvailabilitySlots(coachData.availability_slots);
+  }
+
   const coach = await Coach.create(coachData);
   return coach;
 };
 
-const getCoaches = async () => {
-  const coaches = await Coach.find();
+const getCoaches = async (filters = {}) => {
+  const query = {};
+
+  if (filters.createdBy) {
+    query.created_by = filters.createdBy;
+  }
+
+  if (filters.courseId) {
+    query.course_id = filters.courseId;
+  }
+
+  const coaches = await Coach.find(query);
 
   const bookingStats = await Booking.aggregate([
     { $match: { booking_type: 'COACH', status: 'CONFIRMED' } },
@@ -79,6 +161,14 @@ const updateCoach = async (coachId, coachData) => {
     coachData.profile_img = coachData.image_url;
   }
 
+  if (Object.prototype.hasOwnProperty.call(coachData, 'lessons')) {
+    coachData.lessons = normalizeLessons(coachData.lessons);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(coachData, 'availability_slots')) {
+    coachData.availability_slots = normalizeAvailabilitySlots(coachData.availability_slots);
+  }
+
   if (typeof coachData.rating !== 'undefined' || typeof coachData.students_taught !== 'undefined') {
     const rating = typeof coachData.rating !== 'undefined' ? coachData.rating : 0;
     const studentsTaught = typeof coachData.students_taught !== 'undefined' ? coachData.students_taught : 0;
@@ -98,11 +188,8 @@ const updateCoach = async (coachId, coachData) => {
 };
 
 const deleteCoach = async (coachId) => {
-  const coach = await Coach.findById(coachId);
-  if (coach) {
-    await coach.remove();
-  }
-  return coach;
+  const coach = await Coach.findByIdAndDelete(coachId);
+  return coach || null;
 };
 
 const getCoachLessons = async (coachId) => {

@@ -61,6 +61,18 @@ const BookingSchema = new mongoose.Schema({
     enum: ['CONFIRMED', 'CANCELLED'],
     default: 'CONFIRMED',
   },
+  user_rating: {
+    type: Number,
+    min: [1, 'Rating must be at least 1'],
+    max: [5, 'Rating cannot be more than 5'],
+  },
+  user_rated_at: {
+    type: Date,
+  },
+  admin_notes: {
+    type: String,
+    trim: true,
+  },
   created_at: {
     type: Date,
     default: Date.now,

@@ -10,21 +10,21 @@ const {
   bookCaddie,
   cancelCaddieBooking,
 } = require('../controllers/caddieController');
-const { authenticate, authorize } = require('../middlewares/auth');
+const { authenticate, optionalAuthenticate, authorize } = require('../middlewares/auth');
 const { uploadSingleImage, parseJsonFields } = require('../middlewares/upload');
 const validate = require('../middlewares/validator');
 const { createCaddieSchema, updateCaddieSchema } = require('../utils/validators/caddie.validator');
 
 router
   .route('/')
-  .get(getCaddies)
+  .get(optionalAuthenticate, getCaddies)
   .post(
     authenticate,
-  authorize('COURSE_ADMIN'),
-  uploadSingleImage('image'),
-  parseJsonFields(['availability_slots']), // <-- I strongly suspect this one!
-  validate(createCaddieSchema),
-  createCaddie
+    authorize('COURSE_ADMIN'),
+    uploadSingleImage('image'),
+    parseJsonFields(['availability_slots', 'availabilitySlots']),
+    validate(createCaddieSchema),
+    createCaddie
   );
 
 router
@@ -32,13 +32,13 @@ router
   .get(getCaddie)
   .put(
     authenticate,
-    authorize('COURSE_ADMIN'),
+    authorize('COURSE_ADMIN', 'SUPER_ADMIN'),
     uploadSingleImage('image'),
-    parseJsonFields(['availability_slots']),
+    parseJsonFields(['availability_slots', 'availabilitySlots']),
     validate(updateCaddieSchema),
     updateCaddie
   )
-  .delete(authenticate, authorize('COURSE_ADMIN'), deleteCaddie);
+  .delete(authenticate, authorize('COURSE_ADMIN', 'SUPER_ADMIN'), deleteCaddie);
 
 router.route('/:id/availability').get(getCaddieAvailability);
 

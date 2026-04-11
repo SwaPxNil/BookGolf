@@ -12,6 +12,11 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+const dashboardLoginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required(),
+});
+
 const verify2FASchema = Joi.object({
     temp_token: Joi.string().required(),
     two_factor_code: Joi.string().length(6).required(),
@@ -33,12 +38,18 @@ const updateProfileSchema = Joi.object({
   new_password: Joi.string().min(6).optional(),
 });
 
+const deleteAccountSchema = Joi.object({
+  current_password: Joi.string().min(6).required(),
+});
+
 
 module.exports = {
   registerSchema,
   loginSchema,
+  dashboardLoginSchema,
   verify2FASchema,
   resend2FASchema,
   refreshTokenSchema,
   updateProfileSchema,
+  deleteAccountSchema,
 };
