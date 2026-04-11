@@ -15,7 +15,7 @@ export function removeLogoutListener(fn) {
   const idx = logoutListeners.indexOf(fn);
   if (idx !== -1) logoutListeners.splice(idx, 1);
 }
-function emitLogout() {
+export function emitLogout() {
   logoutListeners.forEach((fn) => {
     try { fn(); } catch {}
   });

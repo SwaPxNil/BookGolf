@@ -97,6 +97,7 @@ export const useBookCoachLesson = (options = {}) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["coaches"] });
       queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings", "me", "recent-lessons"] });
     },
     ...options,
   });
@@ -110,6 +111,7 @@ export const useCancelCoachLessonBooking = (options = {}) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["coaches"] });
       queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings", "me", "recent-lessons"] });
     },
     ...options,
   });

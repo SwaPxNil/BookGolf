@@ -1,5 +1,14 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { getMyProfile, loginUser, refreshAccessToken, registerUser, resend2FA, updateMyProfile, verify2FA } from "../api/authAPI";
+import {
+  deleteMyAccount,
+  getMyProfile,
+  loginUser,
+  refreshAccessToken,
+  registerUser,
+  resend2FA,
+  updateMyProfile,
+  verify2FA,
+} from "../api/authAPI";
 
 
 /* REGISTER */
@@ -55,6 +64,14 @@ export const useMyProfile = (options = {}) => {
 export const useUpdateMyProfile = (options = {}) => {
   return useMutation({
     mutationFn: updateMyProfile,
+    ...options,
+  });
+};
+
+/* DELETE CURRENT USER ACCOUNT */
+export const useDeleteMyAccount = (options = {}) => {
+  return useMutation({
+    mutationFn: deleteMyAccount,
     ...options,
   });
 };

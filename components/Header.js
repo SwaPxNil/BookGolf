@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, Dimensions } from "react-native";
+import { useTheme } from "../theme/ThemeContext";
 
 const { width, height } = Dimensions.get("window");
 
@@ -11,10 +12,12 @@ const COLORS = {
 };
 
 export default function Header({ title, subtitle }) {
+  const { theme } = useTheme();
+
   return (
     <View style={styles.header}>
-      <Text style={[styles.title, { fontSize: 40 * scale }]}>{title}</Text>
-      <Text style={[styles.subtitle, { fontSize: 16 * scale }]}>
+      <Text style={[styles.title, { fontSize: 40 * scale, color: theme.textPrimary }]}>{title}</Text>
+      <Text style={[styles.subtitle, { fontSize: 16 * scale, color: theme.textSecondary }]}>
         {subtitle}
       </Text>
     </View>

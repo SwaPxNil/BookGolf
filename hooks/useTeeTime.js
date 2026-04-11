@@ -44,6 +44,8 @@ export const useBookTeeTime = (options = {}) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["teeTimes"] });
       queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings", "me", "recent-lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings", "me", "recent-caddies"] });
     },
     ...options,
   });

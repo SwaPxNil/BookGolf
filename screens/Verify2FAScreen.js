@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useResend2FA, useVerify2FA } from '../hooks/useAuth';
 import { saveAuthTokens } from '../api/tokenStorage';
+import { usePopup } from '../context/PopupContext';
 
 export default function Verify2FAScreen({ navigation, route, onLoginSuccess }) {
   const [twoFactorCode, setTwoFactorCode] = useState('');
@@ -20,6 +20,7 @@ export default function Verify2FAScreen({ navigation, route, onLoginSuccess }) {
   const verify2FAMutation = useVerify2FA();
   const resend2FAMutation = useResend2FA();
   const userEmail = route?.params?.email;
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     if (countdown <= 0) {
@@ -43,13 +44,13 @@ export default function Verify2FAScreen({ navigation, route, onLoginSuccess }) {
 
   const handleVerify2FA = async () => {
     if (!tempTokenState) {
-      Alert.alert('Session expired', 'Please log in again.');
+      showPopup({ title: 'Session expired', message: 'Please log in again.' });
       navigation.replace('Login');
       return;
     }
 
     if (!twoFactorCode.trim()) {
-      Alert.alert('Missing code', 'Enter your 2FA code to continue.');
+      showPopup({ title: 'Missing code', message: 'Enter your 2FA code to continue.' });
       return;
     }
 
@@ -61,7 +62,7 @@ export default function Verify2FAScreen({ navigation, route, onLoginSuccess }) {
 
       const { accessToken, refreshToken } = extractTokens(verifyResponse);
       if (!accessToken) {
-        Alert.alert('Verification failed', 'No access token was returned by the server.');
+        showPopup({ title: 'Verification failed', message: 'No access token was returned by the server.' });
         return;
       }
 
@@ -69,13 +70,13 @@ export default function Verify2FAScreen({ navigation, route, onLoginSuccess }) {
       onLoginSuccess?.();
     } catch (error) {
       const message = error?.response?.data?.message || error?.response?.data?.msg || '2FA verification failed.';
-      Alert.alert('Verification failed', String(message));
+      showPopup({ title: 'Verification failed', message: String(message) });
     }
   };
 
   const handleResendCode = async () => {
     if (!tempTokenState) {
-      Alert.alert('Session expired', 'Please log in again.');
+      showPopup({ title: 'Session expired', message: 'Please log in again.' });
       navigation.replace('Login');
       return;
     }
@@ -92,10 +93,10 @@ export default function Verify2FAScreen({ navigation, route, onLoginSuccess }) {
       }
 
       setCountdown(60);
-      Alert.alert('Code sent', 'A new OTP has been sent to your email.');
+      showPopup({ title: 'Code sent', message: 'A new OTP has been sent to your email.' });
     } catch (error) {
       const message = error?.response?.data?.message || error?.response?.data?.msg || 'Could not resend OTP right now.';
-      Alert.alert('Resend failed', String(message));
+      showPopup({ title: 'Resend failed', message: String(message) });
     }
   };
 

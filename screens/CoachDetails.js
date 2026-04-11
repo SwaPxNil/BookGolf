@@ -16,6 +16,7 @@ import { useNavigation } from "@react-navigation/native";
 import LessonCard from "../components/LessonCard";
 import { useCoach, useCoachLessons } from "../hooks/useCoach";
 import Navbar from "../components/Navbar";
+import { useTheme } from "../theme/ThemeContext";
 const { width, height } = Dimensions.get("window");
 
 const scale = width / 375;        // iPhone X width reference
@@ -25,6 +26,7 @@ const CIRCLE_SIZE = width * 0.2;
 export default function CoachDetailsScreen({ route }) {
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
+  const { theme, mode } = useTheme();
     const [currentTab, setCurrentTab] = useState("coach");
   
   const coachId = route?.params?.coachId || route?.params?.coach?.id || route?.params?.coach?._id;
@@ -67,18 +69,18 @@ export default function CoachDetailsScreen({ route }) {
 
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}> 
+      <StatusBar style={mode === "dark" ? "light" : "dark"} />
 
       {/* TOP HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Image 
   source={require('../assets/icons/Back.png')} 
-  style={{ width: 32, height: 32, tintColor: '#000' }} 
+  style={{ width: 32, height: 32, tintColor: theme.icon }} 
 />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>LESSONS</Text>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>LESSONS</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>

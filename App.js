@@ -21,6 +21,24 @@ import CoachDetailsScreen from './screens/CoachDetails';
 import LessonBookingScreen from './screens/LessonBooking';
 import CaddieBookingScreen from './screens/CaddieBooking';
 import CoursesScreen from './screens/CoursesScreen';
+import MyBookingsScreen from './screens/MyBookingsScreen';
+import BookingDetailsScreen from './screens/BookingDetailsScreen';
+import HelpSupportScreen from './screens/HelpSupportScreen';
+import ContactUsScreen from './screens/ContactUsScreen';
+import SecurityScreen from './screens/SecurityScreen';
+import PaymentsScreen from './screens/PaymentsScreen';
+import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen';
+import { ThemeProvider } from './theme/ThemeContext';
+import { PopupProvider } from './context/PopupContext';
+import * as Notifications from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const Stack = createNativeStackNavigator();
 const queryClient = new QueryClient();
@@ -61,9 +79,11 @@ export default function App() {
   if (!loaded || !authChecked) return null;
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <ThemeProvider>
+      <PopupProvider>
+        <QueryClientProvider client={queryClient}>
+          <NavigationContainer>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
           {!isAuthenticated ? (
             <>
               <Stack.Screen
@@ -111,11 +131,20 @@ export default function App() {
               <Stack.Screen name="LessonBooking" component={LessonBookingScreen}/>
               <Stack.Screen name="CaddieBooking" component={CaddieBookingScreen}/>
               <Stack.Screen name="CourseScreen" component={CoursesScreen}/>
+              <Stack.Screen name="MyBookings" component={MyBookingsScreen}/>
+              <Stack.Screen name="BookingDetails" component={BookingDetailsScreen}/>
+              <Stack.Screen name="HelpSupport" component={HelpSupportScreen}/>
+              <Stack.Screen name="ContactUs" component={ContactUsScreen}/>
+              <Stack.Screen name="Security" component={SecurityScreen}/>
+              <Stack.Screen name="Payments" component={PaymentsScreen}/>
+              <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen}/>
             </>
           )}
-        </Stack.Navigator>
-      </NavigationContainer>
-    </QueryClientProvider>
+            </Stack.Navigator>
+          </NavigationContainer>
+        </QueryClientProvider>
+      </PopupProvider>
+    </ThemeProvider>
   );
 }
 

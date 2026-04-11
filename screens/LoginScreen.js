@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLogin, useRefreshToken } from '../hooks/useAuth';
 import { saveAuthTokens } from '../api/tokenStorage';
+import { usePopup } from '../context/PopupContext';
 
 export default function LoginScreen({ navigation, onLoginSuccess }) {
   const [email, setEmail] = useState('');
@@ -19,6 +19,7 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
   const loginMutation = useLogin();
   const refreshTokenMutation = useRefreshToken();
+  const { showPopup } = usePopup();
 
   const extractTokens = (response) => {
     const payload = response?.data?.data ?? response?.data ?? {};
@@ -34,7 +35,7 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Missing fields', 'Please enter both email and password.');
+      showPopup({ title: 'Missing fields', message: 'Please enter both email and password.' });
       return;
     }
 
@@ -63,7 +64,7 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
       }
 
       if (!resolvedAccessToken) {
-        Alert.alert('Login failed', 'No access token was returned by the server.');
+        showPopup({ title: 'Login failed', message: 'No access token was returned by the server.' });
         return;
       }
 
@@ -75,7 +76,7 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
     } catch (error) {
       const message =
         error?.response?.data?.message || 'Login failed. Please check your credentials.';
-      Alert.alert('Login failed', String(message));
+      showPopup({ title: 'Login failed', message: String(message) });
     }
   };
 

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -11,7 +10,8 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRegister } from '../hooks/useAuth';
+import { useLogin, useRegister } from '../hooks/useAuth';
+import { usePopup } from '../context/PopupContext';
 
 export default function SignUpScreen({ navigation }) {
   const [fullName, setFullName] = useState('');
@@ -21,32 +21,64 @@ export default function SignUpScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const registerMutation = useRegister();
+  const loginMutation = useLogin();
+  const { showPopup } = usePopup();
+
+  const extractAuthPayload = (response) => {
+    const payload = response?.data?.data ?? response?.data ?? {};
+    return {
+      tempToken: payload?.temp_token || payload?.tempToken || null,
+    };
+  };
 
   const handleSignUp = async () => {
     if (!fullName.trim() || !email.trim() || !password || !confirmPassword) {
-      Alert.alert('Missing fields', 'Please complete all fields.');
+      showPopup({ title: 'Missing fields', message: 'Please complete all fields.' });
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Password mismatch', 'Password and confirm password must match.');
+      showPopup({ title: 'Password mismatch', message: 'Password and confirm password must match.' });
       return;
     }
 
     try {
-      await registerMutation.mutateAsync({
+      const trimmedEmail = email.trim();
+      const registerResponse = await registerMutation.mutateAsync({
         full_name: fullName.trim(),
-        email: email.trim(),
+        email: trimmedEmail,
         password,
-        role: 'user',
+        role: 'USER',
       });
 
-      Alert.alert('Success', 'Account created. You can now log in.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      const registerPayload = extractAuthPayload(registerResponse);
+      let tempTokenForVerification = registerPayload.tempToken;
+
+      if (!tempTokenForVerification) {
+        const loginResponse = await loginMutation.mutateAsync({
+          email: trimmedEmail,
+          password,
+        });
+        const loginPayload = extractAuthPayload(loginResponse);
+        tempTokenForVerification = loginPayload.tempToken;
+      }
+
+      if (tempTokenForVerification) {
+        navigation.navigate('Verify2FA', {
+          tempToken: tempTokenForVerification,
+          email: trimmedEmail,
+        });
+        return;
+      }
+
+      showPopup({
+        title: 'Account created',
+        message: 'Please log in to continue verification.',
+        buttons: [{ text: 'OK', role: 'primary', onPress: () => navigation.goBack() }],
+      });
     } catch (error) {
       const message = error?.response?.data?.message || 'Failed to create account.';
-      Alert.alert('Sign up failed', String(message));
+      showPopup({ title: 'Sign up failed', message: String(message) });
     }
   };
 
@@ -121,12 +153,17 @@ export default function SignUpScreen({ navigation }) {
           </View>
 
           <TouchableOpacity
-            style={[styles.button, registerMutation.isPending && styles.buttonDisabled]}
+            style={[
+              styles.button,
+              (registerMutation.isPending || loginMutation.isPending) && styles.buttonDisabled,
+            ]}
             onPress={handleSignUp}
-            disabled={registerMutation.isPending}
+            disabled={registerMutation.isPending || loginMutation.isPending}
           >
             <Text style={styles.buttonText}>
-              {registerMutation.isPending ? 'Creating...' : 'Create Account'}
+              {registerMutation.isPending || loginMutation.isPending
+                ? 'Creating...'
+                : 'Create Account'}
             </Text>
           </TouchableOpacity>
 

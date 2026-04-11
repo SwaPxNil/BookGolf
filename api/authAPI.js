@@ -71,3 +71,9 @@ export const updateMyProfile = (data) => {
     },
   });
 };
+
+/* DELETE CURRENT USER ACCOUNT */
+export const deleteMyAccount = (data) => {
+  // data: { current_password }
+  return authAxios.delete("/auth/me", { data });
+};

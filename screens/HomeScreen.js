@@ -21,11 +21,15 @@ import { useMyRounds } from "../hooks/useRound";
 import { useCourses } from "../hooks/useCourse";
 import { useCoaches } from "../hooks/useCoach";
 import { useCaddies } from "../hooks/useCaddie";
+import { useMyBookings } from "../hooks/useBooking";
+import { useTheme } from "../theme/ThemeContext";
+import { syncBookingReminderNotifications } from "../utils/bookingReminders";
 
 const cardFallbacks = {
   course: require("../assets/images/course1.png"),
   coach: require("../assets/images/coach1.png"),
   caddie: require("../assets/images/caddie1.png"),
+  booking: require("../assets/images/course1.png"),
 };
 
 const resolveImageSource = (imageUrl, type) => {
@@ -36,12 +40,12 @@ const resolveImageSource = (imageUrl, type) => {
   return cardFallbacks[type] || cardFallbacks.course;
 };
 
-const ShortcutRow = ({ title, actionLabel, onActionPress, items, renderCard }) => (
+const ShortcutRow = ({ title, actionLabel, onActionPress, items, renderCard, theme }) => (
   <View style={styles.quickSectionBlock}>
     <View style={styles.quickSectionHeader}>
-      <Text style={styles.quickSectionTitle}>{title}</Text>
+      <Text style={[styles.quickSectionTitle, { color: theme.textPrimary }]}>{title}</Text>
       <TouchableOpacity onPress={onActionPress} activeOpacity={0.8}>
-        <Text style={styles.quickSectionLink}>{actionLabel}</Text>
+        <Text style={[styles.quickSectionLink, { color: theme.accent }]}>{actionLabel}</Text>
       </TouchableOpacity>
     </View>
 
@@ -57,7 +61,9 @@ const ShortcutRow = ({ title, actionLabel, onActionPress, items, renderCard }) =
 
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const { theme, mode } = useTheme();
   const { width, height } = useWindowDimensions();
+  const iconTop = height * 0.055;
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [currentTab, setCurrentTab] = useState("home");
@@ -73,6 +79,7 @@ export default function HomeScreen() {
   const { data: coursesData, refetch: refetchCourses } = useCourses({ retry: false });
   const { data: coachesData, refetch: refetchCoaches } = useCoaches({ retry: false });
   const { data: caddiesData, refetch: refetchCaddies } = useCaddies({ retry: false });
+  const { data: myBookingsData, refetch: refetchMyBookings } = useMyBookings({ retry: false });
 
   function getTimePeriod() {
     const hour = new Date().getHours();
@@ -121,11 +128,23 @@ export default function HomeScreen() {
   const courses = Array.isArray(coursesData?.data?.data) ? coursesData.data.data : [];
   const coaches = Array.isArray(coachesData?.data?.data) ? coachesData.data.data : [];
   const caddies = Array.isArray(caddiesData?.data?.data) ? caddiesData.data.data : [];
+  const myBookings = Array.isArray(myBookingsData?.data?.data) ? myBookingsData.data.data : [];
+  const userRecentBookings = myBookings.slice(0, 5);
   const dashboardSubtitle =
     dashboard?.summary_text ||
     dashboard?.message ||
     dashboard?.subtitle;
   const userName = profile?.full_name || "GOLFER";
+
+  useEffect(() => {
+    if (isAdmin || myBookings.length === 0) {
+      return;
+    }
+
+    syncBookingReminderNotifications(myBookings).catch((error) => {
+      console.warn("Booking reminder scheduling failed:", error?.message || error);
+    });
+  }, [myBookings, isAdmin]);
 
   const ui = {
     morning: { text: `GOOD MORNING,\n${userName.toUpperCase()}!`, sub: "Welcome back" },
@@ -144,6 +163,7 @@ export default function HomeScreen() {
         refetchCourses(),
         refetchCoaches(),
         refetchCaddies(),
+        refetchMyBookings(),
       ]);
     } finally {
       setRefreshing(false);
@@ -182,14 +202,53 @@ export default function HomeScreen() {
       raw: caddie,
     }));
 
+  const recentBookingCards = userRecentBookings.map((booking, index) => {
+    const title =
+      booking?.booking_type === "TEE_TIME"
+        ? booking?.service_details?.course?.name || booking?.course_id?.name || "Course tee time"
+        : booking?.booking_type === "COACH"
+        ? booking?.service_details?.lesson?.title || booking?.lesson?.title || booking?.coach_id?.full_name || "Coach lesson"
+        : booking?.service_details?.caddie?.full_name || booking?.caddie_id?.full_name || "Caddie booking";
+
+    const dt = new Date(booking?.slot || booking?.booking_datetime || booking?.created_at);
+    const dateLabel = Number.isNaN(dt.getTime())
+      ? "Unknown date"
+      : dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+    const imageUrl =
+      booking?.booking_type === "TEE_TIME"
+        ? booking?.service_details?.course?.image_url || booking?.course_id?.image_url || null
+        : booking?.booking_type === "COACH"
+        ? booking?.service_details?.coach?.profile_img
+          || booking?.service_details?.coach?.image_url
+          || booking?.coach_id?.profile_img
+          || booking?.coach_id?.image_url
+          || null
+        : booking?.service_details?.caddie?.profile_img
+          || booking?.service_details?.caddie?.image_url
+          || booking?.caddie_id?.profile_img
+          || booking?.caddie_id?.image_url
+          || null;
+
+    return {
+      id: booking?._id ?? `booking-${index}`,
+      title,
+      status: booking?.status || "CONFIRMED",
+      type: (booking?.booking_type || "BOOKING").replace("_", " "),
+      dateLabel,
+      imageUrl,
+      raw: booking,
+    };
+  });
+
   return (
-    <SafeAreaView style={[styles.container, { paddingHorizontal: width * 0.06 }]}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { paddingHorizontal: width * 0.06, backgroundColor: theme.bg }]}>
+      <StatusBar style={mode === "dark" ? "light" : "dark"} />
 
       <TouchableOpacity
         style={[
           styles.profileContainer,
-          { top: height * 0.055, right: width * 0.05 },
+          { top: iconTop, right: width * 0.05 },
         ]}
         onPress={() => navigation.navigate("profile")}
       >
@@ -202,12 +261,34 @@ export default function HomeScreen() {
       <TouchableOpacity
         style={[
           styles.searchContainer,
-          { top: height * 0.055, right: width * 0.18 },
+          { top: iconTop, right: width * 0.18 },
         ]}
         onPress={() => navigation.navigate("SearchScreen")}
       >
-        <Ionicons name="search" size={22} color="#000" />
+        <Ionicons name="search" size={22} color={theme.icon} />
       </TouchableOpacity>
+
+      {!isAdmin ? (
+        <TouchableOpacity
+          style={[
+            styles.myBookingsIconContainer,
+            { top: iconTop, right: width * 0.31 },
+          ]}
+          onPress={() => navigation.navigate("MyBookings")}
+        >
+          <Ionicons name="bookmarks" size={22} color={theme.icon} />
+        </TouchableOpacity>
+      ) : null}
+
+      <View
+        style={[
+          styles.brandWordmark,
+          { top: iconTop, left: width * 0.035 },
+        ]}
+      >
+        <Text style={[styles.brandClubText, { color: mode === "dark" ? "#8AA77B" : "#355742", fontSize: width * 0.14 }]}>CLUB</Text>
+        <Text style={[styles.brandYearText, { color: mode === "dark" ? "#D7C47C" : "#B79A2A", fontSize: width * 0.11 }]}>1917</Text>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -217,59 +298,104 @@ export default function HomeScreen() {
         }
       >
         <Animated.View style={{ opacity: fadeAnim }}>
-          <Text style={[styles.title, { fontSize: width * 0.12, marginTop: height * 0.1 }]}>
+          <Text style={[styles.title, { fontSize: width * 0.12, marginTop: height * 0.1, color: theme.textPrimary }]}>
             {ui.text}
           </Text>
 
-          <Text style={[styles.subtitle, { fontSize: width * 0.04 }]}>
+          <Text style={[styles.subtitle, { fontSize: width * 0.04, color: theme.textSecondary }]}> 
             {dashboardLoading ? "Loading dashboard..." : dashboardSubtitle || ui.sub}
           </Text>
 
-          <Text style={[styles.sectionTitle, { fontSize: width * 0.06, marginTop: height * 0.05 }]}>
-            {isAdmin ? "RECENT BOOKINGS" : "RECENT LESSONS"}
-          </Text>
+          {isAdmin ? (
+            <>
+              <Text style={[styles.sectionTitle, { fontSize: width * 0.06, marginTop: 14, color: theme.textPrimary }]}> 
+                RECENT BOOKINGS
+              </Text>
+            <View style={[styles.lessonCard, { borderRadius: width * 0.07 }]}>
+              {recentBookings.map((booking, index) => {
+                const subjectName =
+                  booking?.booking_type === "TEE_TIME"
+                    ? booking?.course_id?.name || "Course tee time"
+                    : booking?.booking_type === "COACH"
+                    ? booking?.coach_id?.full_name || "Coach lesson"
+                    : booking?.caddie_id?.full_name || "Caddie booking";
 
-          <View style={[styles.lessonCard, { borderRadius: width * 0.07 }]}>
-            {isAdmin
-              ? recentBookings.map((booking, index) => {
-                  const subjectName =
-                    booking?.booking_type === "TEE_TIME"
-                      ? booking?.course_id?.name || "Course tee time"
-                      : booking?.booking_type === "COACH"
-                      ? booking?.coach_id?.full_name || "Coach lesson"
-                      : booking?.caddie_id?.full_name || "Caddie booking";
-
-                  return (
-                    <View key={`${booking?._id ?? index}`} style={styles.lessonRow}>
-                      <View style={styles.lessonTextBlock}>
-                        <Text style={styles.lessonText}>
-                          {booking?.user_id?.full_name || "User"} - {subjectName}
-                        </Text>
-                        <Text style={styles.lessonMeta}>
-                          {(booking?.booking_type || "").replace("_", " ")} - {booking?.status || "CONFIRMED"}
-                        </Text>
-                      </View>
-                      <Text style={styles.lessonScore}>
-                        {booking?.slot ? new Date(booking.slot).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "-"}
+                return (
+                  <View key={`${booking?._id ?? index}`} style={styles.lessonRow}>
+                    <View style={styles.lessonTextBlock}>
+                      <Text style={styles.lessonText}>
+                        {booking?.user_id?.full_name || "User"} - {subjectName}
+                      </Text>
+                      <Text style={styles.lessonMeta}>
+                        {(booking?.booking_type || "").replace("_", " ")} - {booking?.status || "CONFIRMED"}
                       </Text>
                     </View>
-                  );
-                })
-              : recentRounds.map((round, index) => (
-                  <View key={`${round?.id ?? round?._id ?? index}`} style={styles.lessonRow}>
-                    <Text style={styles.lessonText}>{round?.date || round?.played_at || "Round"}</Text>
-                    <Text style={styles.lessonScore}>{round?.score ?? round?.total_score ?? "-"}</Text>
+                    <Text style={styles.lessonScore}>
+                      {booking?.slot ? new Date(booking.slot).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "-"}
+                    </Text>
                   </View>
-                ))}
-            {isAdmin && recentBookings.length === 0 ? (
-              <Text style={styles.lessonEmpty}>No recent bookings found.</Text>
-            ) : null}
-            {!isAdmin && recentRounds.length === 0 ? (
-              <Text style={styles.lessonEmpty}>No recent rounds found.</Text>
-            ) : null}
-          </View>
+                );
+              })}
+              {recentBookings.length === 0 ? (
+                <Text style={styles.lessonEmpty}>No recent bookings found.</Text>
+              ) : null}
+            </View>
+            </>
+          ) : (
+            <View style={styles.recentBookingsBlock}>
+              <View style={styles.sectionRowCompact}>
+                <Text style={[styles.sectionTitle, { fontSize: width * 0.06, color: theme.textPrimary }]}>RECENT BOOKINGS</Text>
+                <TouchableOpacity onPress={() => navigation.navigate("MyBookings")} activeOpacity={0.8}>
+                  <Text style={[styles.quickSectionLink, { color: theme.accent }]}>See all</Text>
+                </TouchableOpacity>
+              </View>
 
-          <Text style={[styles.sectionTitle, { fontSize: width * 0.06, marginTop: height * 0.05 }]}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.quickHorizontalList}
+              >
+                {recentBookingCards.map((bookingCard, index) => (
+                  <TouchableOpacity
+                    key={bookingCard.id}
+                    style={[styles.personCard, index > 0 && styles.personCardSpacing]}
+                    onPress={() =>
+                      navigation.navigate("BookingDetails", {
+                        bookingId: bookingCard.raw?._id,
+                        booking: bookingCard.raw,
+                      })
+                    }
+                    activeOpacity={0.9}
+                  >
+                    <Image
+                      source={resolveImageSource(
+                        bookingCard.imageUrl,
+                        bookingCard.type.includes("COACH")
+                          ? "coach"
+                          : bookingCard.type.includes("CADDIE")
+                          ? "caddie"
+                          : "course"
+                      )}
+                      style={styles.personImage}
+                    />
+                    <View style={styles.personInfo}>
+                      <Text style={styles.personName} numberOfLines={1}>
+                        {bookingCard.title}
+                      </Text>
+                      <Text style={styles.personMeta}>{bookingCard.type}</Text>
+                      <Text style={styles.personMeta}>{bookingCard.status}</Text>
+                      <Text style={styles.bookingCardDateInline}>{bookingCard.dateLabel}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                {recentBookingCards.length === 0 ? (
+                  <Text style={styles.lessonEmpty}>No recent bookings found.</Text>
+                ) : null}
+              </ScrollView>
+            </View>
+          )}
+
+          <Text style={[styles.sectionTitle, { fontSize: width * 0.06, marginTop: 30, color: theme.textPrimary }]}> 
             HANDICAP CALCULATION
           </Text>
 
@@ -297,6 +423,7 @@ export default function HomeScreen() {
               actionLabel="See all"
               onActionPress={() => navigation.navigate("CourseScreen")}
               items={featuredCourses}
+              theme={theme}
               renderCard={(course, index) => (
                 <TouchableOpacity
                   key={course.id || `course-${index}`}
@@ -326,6 +453,7 @@ export default function HomeScreen() {
               actionLabel="See all"
               onActionPress={() => navigation.navigate("coach")}
               items={topCoaches}
+              theme={theme}
               renderCard={(coach, index) => (
                 <TouchableOpacity
                   key={coach.id || `coach-${index}`}
@@ -358,6 +486,7 @@ export default function HomeScreen() {
               actionLabel="See all"
               onActionPress={() => navigation.navigate("caddie")}
               items={topCaddies}
+              theme={theme}
               renderCard={(caddie, index) => (
                 <TouchableOpacity
                   key={caddie.id || `caddie-${index}`}
@@ -423,9 +552,37 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
+  myBookingsIconContainer: {
+    position: "absolute",
+    width: 45,
+    height: 45,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+
   profileImage: {
     width: "100%",
     height: "100%",
+  },
+
+  brandWordmark: {
+    position: "absolute",
+    zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 4,
+  },
+  brandClubText: {
+    fontFamily: "Bebas",
+    letterSpacing: 0.8,
+  },
+  brandYearText: {
+    fontFamily: "Bebas",
+    letterSpacing: 1.5,
+    marginLeft: 4,
+    marginBottom: 0,
   },
 
   title: {
@@ -533,6 +690,21 @@ const styles = StyleSheet.create({
   quickSectionBlock: {
     marginBottom: 24,
   },
+  recentBookingsBlock: {
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  sectionRowCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  recentBookingsHeader: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 8,
+  },
   quickSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -630,5 +802,12 @@ const styles = StyleSheet.create({
     fontFamily: "Abel",
     fontSize: 14,
     marginLeft: 4,
+  },
+  bookingCardDateInline: {
+    color: "#2E4A37",
+    fontFamily: "Bebas",
+    fontSize: 18,
+    letterSpacing: 0.5,
+    marginTop: 6,
   },
 });

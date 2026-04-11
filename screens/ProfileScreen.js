@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -16,10 +16,15 @@ import Navbar from "../components/Navbar";
 import { useNavigation } from "@react-navigation/native";
 import { useMyProfile, useRefreshToken } from "../hooks/useAuth";
 import { useMyPayments } from "../hooks/usePayment";
-import { useCourseAdmins } from "../hooks/useSuperAdmin";
-import { useAdminLogs } from "../hooks/useAdminLog";
 import { clearAuthTokens } from '../api/tokenStorage';
 import { emitLogout } from '../api/axiosInstance';
+import { useTheme } from "../theme/ThemeContext";
+import {
+  getNotificationSettings,
+  NOTIFICATION_PREFERENCES,
+  setNotificationEnabled,
+  setNotificationPreference,
+} from "../utils/notificationSettings";
   // Logout handler
   const handleLogout = async () => {
     await clearAuthTokens();
@@ -29,8 +34,11 @@ import { emitLogout } from '../api/axiosInstance';
 export default function ProfileScreen() {
   const { width, height } = useWindowDimensions();
   const navigation = useNavigation();
+  const { theme, mode, toggleTheme } = useTheme();
   const [currentTab, setCurrentTab] = useState("profile");
   const [refreshing, setRefreshing] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [notificationPreference, setNotificationPreferenceState] = useState(NOTIFICATION_PREFERENCES.ALL);
   const {
     data: profileData,
     isLoading: profileLoading,
@@ -38,25 +46,33 @@ export default function ProfileScreen() {
     refetch: refetchProfile,
   } = useMyProfile({ retry: false });
   const { data: paymentsData, refetch: refetchPayments } = useMyPayments({ retry: false });
-  const { data: courseAdminsData, refetch: refetchCourseAdmins } = useCourseAdmins({ retry: false });
-  const { data: adminLogsData, refetch: refetchAdminLogs } = useAdminLogs({ retry: false });
   const refreshTokenMutation = useRefreshToken();
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadNotificationSettings = async () => {
+      const settings = await getNotificationSettings();
+      if (!mounted) {
+        return;
+      }
+
+      setNotificationsEnabled(settings.enabled);
+      setNotificationPreferenceState(settings.preference);
+    };
+
+    loadNotificationSettings();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const profile = profileData?.data?.data ?? profileData?.data ?? {};
   const payments = Array.isArray(paymentsData?.data?.data)
     ? paymentsData.data.data
     : Array.isArray(paymentsData?.data)
     ? paymentsData.data
-    : [];
-  const courseAdmins = Array.isArray(courseAdminsData?.data)
-    ? courseAdminsData.data
-    : Array.isArray(courseAdminsData?.data?.data)
-    ? courseAdminsData.data.data
-    : [];
-  const adminLogs = Array.isArray(adminLogsData?.data?.data)
-    ? adminLogsData.data.data
-    : Array.isArray(adminLogsData?.data)
-    ? adminLogsData.data
     : [];
 
   const handleRefresh = async () => {
@@ -65,8 +81,6 @@ export default function ProfileScreen() {
       await Promise.allSettled([
         refetchProfile(),
         refetchPayments(),
-        refetchCourseAdmins(),
-        refetchAdminLogs(),
       ]);
     } finally {
       setRefreshing(false);
@@ -75,16 +89,35 @@ export default function ProfileScreen() {
 
   const handleTabPress = (tab) => navigation.navigate(tab);
 
+  const handleToggleNotifications = async () => {
+    const nextValue = !notificationsEnabled;
+    setNotificationsEnabled(nextValue);
+    await setNotificationEnabled(nextValue);
+  };
+
+  const handleCycleNotificationPreference = async () => {
+    const nextPreference =
+      notificationPreference === NOTIFICATION_PREFERENCES.ALL
+        ? NOTIFICATION_PREFERENCES.BOOKINGS_ONLY
+        : NOTIFICATION_PREFERENCES.ALL;
+
+    setNotificationPreferenceState(nextPreference);
+    await setNotificationPreference(nextPreference);
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}> 
+      <StatusBar style={mode === "dark" ? "light" : "dark"} />
 
       {/* BACK BUTTON */}
       <TouchableOpacity
         style={{ paddingTop: height * 0.015, paddingLeft: width * 0.04 }}
         onPress={() => navigation.goBack()}
       >
-        <Ionicons name="arrow-back" size={26} color="#262B27" />
+        <Image
+          source={require("../assets/icons/Back.png")}
+          style={{ width: 32, height: 32, tintColor: theme.icon }}
+        />
       </TouchableOpacity>
 
       <ScrollView
@@ -132,7 +165,7 @@ export default function ProfileScreen() {
           style={{
             textAlign: "center",
             fontSize: width * 0.08,
-            color: "#1A1A1A",
+            color: theme.textPrimary,
             marginTop: height * 0.015,
             fontFamily: "Bebas",
           }}
@@ -143,7 +176,7 @@ export default function ProfileScreen() {
           style={{
             textAlign: "center",
             fontSize: width * 0.036,
-            color: "#333",
+            color: theme.textSecondary,
             fontFamily: "Abel",
           }}
         >
@@ -158,7 +191,7 @@ export default function ProfileScreen() {
         {/* FIRST CARD */}
         <View
           style={{
-            backgroundColor: "#262B27",
+            backgroundColor: theme.card,
             marginHorizontal: width * 0.05,
             marginTop: height * 0.025,
             padding: width * 0.045,
@@ -168,43 +201,73 @@ export default function ProfileScreen() {
           <Option
             icon="person-outline"
             title="Edit profile information"
+            theme={theme}
             onPress={() => navigation.navigate("EditProfile")}
           />
-          <OptionRight icon="notifications" title="Notifications" value="ON" />
-          <OptionRight icon="language-sharp" title="Language" value="ENGLISH" />
-          <OptionRight icon="card-outline" title="Payments" value={`${payments.length}`} />
+          <OptionRight
+            icon="notifications"
+            title="Notifications"
+            value={notificationsEnabled ? "ON" : "OFF"}
+            theme={theme}
+            onPress={handleToggleNotifications}
+          />
+          <OptionRight
+            icon="options-outline"
+            title="Notification Pref"
+            value={notificationPreference === NOTIFICATION_PREFERENCES.ALL ? "ALL" : "BOOKINGS"}
+            theme={theme}
+            onPress={handleCycleNotificationPreference}
+          />
+          <OptionRight icon="language-sharp" title="Language" value="ENGLISH" theme={theme} />
+          <OptionRight
+            icon="card-outline"
+            title="Payments"
+            value={`${payments.length}`}
+            theme={theme}
+            onPress={() => navigation.navigate("Payments")}
+          />
+          <Option icon="bookmark-outline" title="My Bookings" theme={theme} onPress={() => navigation.navigate("MyBookings")} />
         </View>
 
         {/* SECOND CARD */}
         <View
           style={{
-            backgroundColor: "#262B27",
+            backgroundColor: theme.card,
             marginHorizontal: width * 0.05,
             marginTop: height * 0.02,
             padding: width * 0.045,
             borderRadius: width * 0.05,
           }}
         >
-          <Option icon="lock-closed-outline" title="Security" />
-          <OptionRight icon="sunny-outline" title="Theme" value="Light mode" />
-          <OptionRight icon="refresh-outline" title="Session" value={refreshTokenMutation.isPending ? "Refreshing" : "Active"} />
+          <Option icon="lock-closed-outline" title="Security" theme={theme} onPress={() => navigation.navigate("Security")} />
+          <OptionRight
+            icon="sunny-outline"
+            title="Theme"
+            value={mode === "dark" ? "Dark mode" : "Light mode"}
+            theme={theme}
+            onPress={toggleTheme}
+          />
+          <OptionRight
+            icon="refresh-outline"
+            title="Session"
+            value={refreshTokenMutation.isPending ? "Refreshing" : "Active"}
+            theme={theme}
+          />
         </View>
 
         {/* THIRD CARD */}
         <View
           style={{
-            backgroundColor: "#262B27",
+            backgroundColor: theme.card,
             marginHorizontal: width * 0.05,
             marginTop: height * 0.02,
             padding: width * 0.045,
             borderRadius: width * 0.05,
           }}
         >
-          <Option icon="help-circle" title="Help & Support" />
-          <Option icon="mail-outline" title="Contact us" />
-          <Option icon="document-text-outline" title="Privacy policy" />
-          <OptionRight icon="people-outline" title="Course Admins" value={`${courseAdmins.length}`} />
-          <OptionRight icon="list-outline" title="Admin Logs" value={`${adminLogs.length}`} />
+          <Option icon="help-circle" title="Help & Support" theme={theme} onPress={() => navigation.navigate("HelpSupport")} />
+          <Option icon="mail-outline" title="Contact us" theme={theme} onPress={() => navigation.navigate("ContactUs")} />
+          <Option icon="document-text-outline" title="Privacy policy" theme={theme} onPress={() => navigation.navigate("PrivacyPolicy")} />
           {/* Logout Button */}
           <TouchableOpacity
             style={{
@@ -228,7 +291,7 @@ export default function ProfileScreen() {
       <Navbar
         currentTab={currentTab}
         onTabPress={handleTabPress}
-        onPressMiddle={() => navigation.navigate("ReservationScreen")}
+        onPressMiddle={() => navigation.navigate("CourseScreen")}
       />
     </SafeAreaView>
   );
@@ -236,7 +299,7 @@ export default function ProfileScreen() {
 
 /* ---------------------- REUSABLE OPTION COMPONENTS ---------------------- */
 
-const Option = ({ icon, title, onPress }) => (
+const Option = ({ icon, title, onPress, theme }) => (
   <TouchableOpacity
     style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 }}
     onPress={onPress}
@@ -249,13 +312,17 @@ const Option = ({ icon, title, onPress }) => (
   </TouchableOpacity>
 );
 
-const OptionRight = ({ icon, title, value }) => (
-  <TouchableOpacity style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 }}>
+const OptionRight = ({ icon, title, value, onPress, theme }) => (
+  <TouchableOpacity
+    style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 }}
+    onPress={onPress}
+    disabled={!onPress}
+  >
     <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
       <Ionicons name={icon} size={20} color="#fff" />
       <Text style={{ color: "#fff", fontSize: 16, fontFamily: "Abel" }}>{title}</Text>
     </View>
-    <Text style={{ color: "#798D3D", fontSize: 20, fontFamily: "Bebas" }}>{value}</Text>
+    <Text style={{ color: theme?.accent || "#798D3D", fontSize: 20, fontFamily: "Bebas" }}>{value}</Text>
   </TouchableOpacity>
 );
 

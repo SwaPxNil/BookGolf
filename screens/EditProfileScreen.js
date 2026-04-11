@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,9 +16,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { useMyProfile, useUpdateMyProfile } from "../hooks/useAuth";
+import { useTheme } from "../theme/ThemeContext";
+import { usePopup } from "../context/PopupContext";
 
 export default function EditProfileScreen({ navigation }) {
   const { width, height } = useWindowDimensions();
+  const { theme } = useTheme();
+  const { showPopup } = usePopup();
   const queryClient = useQueryClient();
   const { data: profileData } = useMyProfile({ retry: false });
   const updateProfileMutation = useUpdateMyProfile();
@@ -60,7 +63,7 @@ export default function EditProfileScreen({ navigation }) {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("Permission needed", "Please allow photo access to upload your profile image.");
+        showPopup({ title: "Permission needed", message: "Please allow photo access to upload your profile image." });
         return;
       }
 
@@ -82,29 +85,29 @@ export default function EditProfileScreen({ navigation }) {
         name: asset.fileName || `profile-${Date.now()}.${extension}`,
       });
     } catch (error) {
-      Alert.alert("Image error", "Could not pick image right now.");
+      showPopup({ title: "Image error", message: "Could not pick image right now." });
     }
   };
 
   const handleSave = async () => {
     if (!fullName.trim() || !email.trim()) {
-      Alert.alert("Missing fields", "Name and email are required.");
+      showPopup({ title: "Missing fields", message: "Name and email are required." });
       return;
     }
 
     if (newPassword || currentPassword || confirmNewPassword) {
       if (!currentPassword) {
-        Alert.alert("Current password required", "Enter your current password to set a new password.");
+        showPopup({ title: "Current password required", message: "Enter your current password to set a new password." });
         return;
       }
 
       if (!newPassword) {
-        Alert.alert("Missing new password", "Enter a new password.");
+        showPopup({ title: "Missing new password", message: "Enter a new password." });
         return;
       }
 
       if (newPassword !== confirmNewPassword) {
-        Alert.alert("Password mismatch", "New password and confirm password must match.");
+        showPopup({ title: "Password mismatch", message: "New password and confirm password must match." });
         return;
       }
     }
@@ -127,21 +130,23 @@ export default function EditProfileScreen({ navigation }) {
     try {
       await updateProfileMutation.mutateAsync(payload);
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      Alert.alert("Updated", "Your profile has been updated.", [
-        { text: "OK", onPress: () => navigation.goBack() },
-      ]);
+      showPopup({
+        title: "Updated",
+        message: "Your profile has been updated.",
+        buttons: [{ text: "OK", role: "primary", onPress: () => navigation.goBack() }],
+      });
     } catch (error) {
       const message =
         error?.response?.data?.msg ||
         error?.response?.data?.message ||
         error?.response?.data?.error ||
         "Failed to update profile.";
-      Alert.alert("Update failed", String(message));
+      showPopup({ title: "Update failed", message: String(message) });
     }
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.bg }]}> 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.container}
@@ -150,7 +155,7 @@ export default function EditProfileScreen({ navigation }) {
           style={[styles.backBtn, { paddingTop: height * 0.015, paddingLeft: width * 0.04 }]}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={26} color="#262B27" />
+          <Ionicons name="arrow-back" size={26} color={theme.icon} />
         </TouchableOpacity>
 
         <ScrollView contentContainerStyle={{ paddingBottom: height * 0.12 }} keyboardShouldPersistTaps="handled">
@@ -185,7 +190,7 @@ export default function EditProfileScreen({ navigation }) {
             style={{
               textAlign: "center",
               fontSize: width * 0.082,
-              color: "#1A1A1A",
+              color: theme.textPrimary,
               marginTop: height * 0.012,
               fontFamily: "Bebas",
             }}
@@ -197,7 +202,7 @@ export default function EditProfileScreen({ navigation }) {
             style={{
               textAlign: "center",
               fontSize: width * 0.037,
-              color: "#333",
+              color: theme.textSecondary,
               fontFamily: "Abel",
               marginTop: 2,
             }}

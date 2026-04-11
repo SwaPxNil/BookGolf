@@ -17,9 +17,11 @@ import Header from "../components/Header";
 import Navbar from "../components/Navbar";
 import { useCourses } from "../hooks/useCourse";
 import { useMyProfile } from "../hooks/useAuth";
+import { useTheme } from "../theme/ThemeContext";
 
 export default function CoursesScreen() {
   const navigation = useNavigation();
+  const { theme, mode } = useTheme();
   const scrollX = useRef(new Animated.Value(0)).current;
   const [activeIndex, setActiveIndex] = useState(0);
   const [currentTab, setCurrentTab] = useState("courses");
@@ -133,8 +135,8 @@ export default function CoursesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}> 
+      <StatusBar style={mode === "dark" ? "light" : "dark"} />
 
       <TouchableOpacity
         style={[
@@ -155,8 +157,8 @@ export default function CoursesScreen() {
       />
 
       <View style={styles.locationRow}>
-        <Ionicons name="globe-outline" size={14} color="#333" />
-        <Text style={styles.locationText}>
+        <Ionicons name="globe-outline" size={14} color={theme.textSecondary} />
+        <Text style={[styles.locationText, { color: theme.textSecondary }]}>
           {coursesToRender[activeIndex]?.location || "Location unavailable"}
         </Text>
       </View>

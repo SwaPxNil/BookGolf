@@ -3,6 +3,7 @@ import {
   createRound,
   getMyRounds,
   getRoundById,
+  updateRoundScorecard,
 } from "../api/roundAPI";
 
 /* GET CURRENT USER ROUNDS */
@@ -32,6 +33,22 @@ export const useCreateRound = (options = {}) => {
     mutationFn: createRound,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rounds", "me"] });
+    },
+    ...options,
+  });
+};
+
+/* UPDATE ROUND SCORECARD */
+export const useUpdateRoundScorecard = (options = {}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ roundId, payload }) => updateRoundScorecard(roundId, payload),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["rounds", "me"] });
+      if (variables?.roundId) {
+        queryClient.invalidateQueries({ queryKey: ["rounds", variables.roundId] });
+      }
     },
     ...options,
   });

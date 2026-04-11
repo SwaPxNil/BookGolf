@@ -18,8 +18,10 @@ import Header from "../components/Header";
 import Navbar from "../components/Navbar";
 import { useCaddies } from "../hooks/useCaddie";
 import { useMyProfile } from "../hooks/useAuth";
+import { useTheme } from "../theme/ThemeContext";
 
 export default function CaddieScreen({ navigation }) {
+  const { theme, mode } = useTheme();
   const [currentTab, setCurrentTab] = useState("caddie");
   const [searchQuery, setSearchQuery] = useState("");
   // We grab both width and height here
@@ -71,8 +73,8 @@ export default function CaddieScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}> 
+      <StatusBar style={mode === "dark" ? "light" : "dark"} />
 
       <TouchableOpacity
         style={[
@@ -93,13 +95,13 @@ export default function CaddieScreen({ navigation }) {
       />
 
       <View style={[styles.searchRow, { marginHorizontal: width * 0.05 }]}>
-        <Ionicons name="search-outline" size={20} color="#333" />
+        <Ionicons name="search-outline" size={20} color={theme.textSecondary} />
         <TextInput
           placeholder="Search"
-          placeholderTextColor="#555"
+          placeholderTextColor={theme.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          style={[styles.searchInput, { width: width * 0.7 }]}
+          style={[styles.searchInput, { width: width * 0.7, color: theme.textPrimary }]}
         />
       </View>
 
@@ -116,6 +118,7 @@ export default function CaddieScreen({ navigation }) {
           caddies={topRated}
           width={width}
           height={height}
+          theme={theme}
           onPress={handleCaddiePress}
         />
 
@@ -125,6 +128,7 @@ export default function CaddieScreen({ navigation }) {
           caddies={available}
           width={width}
           height={height}
+          theme={theme}
           onPress={handleCaddiePress}
         />
       </ScrollView>
@@ -139,11 +143,11 @@ export default function CaddieScreen({ navigation }) {
 }
 
 // Receive height in props here
-const CaddieSection = ({ title, caddies, width, height, onPress }) => (
+const CaddieSection = ({ title, caddies, width, height, onPress, theme }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.viewAll}>view all</Text>
+      <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>{title}</Text>
+      <Text style={[styles.viewAll, { color: theme.accent }]}>view all</Text>
     </View>
 
     <ScrollView

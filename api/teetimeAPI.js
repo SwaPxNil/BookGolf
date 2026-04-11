@@ -18,9 +18,17 @@ export const createTeeTime = (payload) => {
 
 /* BOOK TEE TIME (USER) */
 export const bookTeeTime = (payload) => {
+  const resolvedTeeTimeId =
+    payload?.tee_time_id ??
+    payload?.teeTimeId ??
+    payload?.tee_time ??
+    payload?.id ??
+    null;
+
   const normalizedPayload = {
     ...payload,
-    teeTimeId: payload?.teeTimeId ?? payload?.tee_time_id,
+    tee_time_id: resolvedTeeTimeId,
+    teeTimeId: resolvedTeeTimeId,
   };
 
   return authAxios.post("/tee-times/book", normalizedPayload);

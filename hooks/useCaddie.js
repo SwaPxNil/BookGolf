@@ -87,6 +87,7 @@ export const useBookCaddie = (options = {}) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["caddies"] });
       queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings", "me", "recent-caddies"] });
     },
     ...options,
   });
@@ -100,6 +101,7 @@ export const useCancelCaddieBooking = (options = {}) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["caddies"] });
       queryClient.invalidateQueries({ queryKey: ["bookings", "me"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings", "me", "recent-caddies"] });
     },
     ...options,
   });

@@ -1,11 +1,14 @@
 // components/Navbar.js
 import React from "react";
 import { View, TouchableOpacity, StyleSheet, Image } from "react-native";
+import { useTheme } from "../theme/ThemeContext";
 
 export default function Navbar({ currentTab, onTabPress, onPressMiddle }) {
+  const { theme } = useTheme();
+
   return (
     <View style={styles.wrapper}>
-      <View style={styles.navbar}>
+      <View style={[styles.navbar, { backgroundColor: theme.card }]}> 
         {/* HOME */}
         <TouchableOpacity
           style={styles.navItem}
@@ -13,10 +16,10 @@ export default function Navbar({ currentTab, onTabPress, onPressMiddle }) {
         >
           <Image
             source={require("../assets/icons/Home.png")}
-            style={styles.icon}
+            style={[styles.icon, { tintColor: theme.accent }]}
             resizeMode="contain"
           />
-          {currentTab === "home" && <View style={styles.dot} />}
+          {currentTab === "home" && <View style={[styles.dot, { backgroundColor: theme.accent }]} />}
         </TouchableOpacity>
 
         {/* TROPHY */}
@@ -26,17 +29,17 @@ export default function Navbar({ currentTab, onTabPress, onPressMiddle }) {
         >
           <Image
             source={require("../assets/icons/Score.png")}
-            style={styles.icon}
+            style={[styles.icon, { tintColor: theme.accent }]}
             resizeMode="contain"
           />
-          {currentTab === "match" && <View style={styles.dot} />}
+          {currentTab === "match" && <View style={[styles.dot, { backgroundColor: theme.accent }]} />}
         </TouchableOpacity>
 
         {/* CENTER BUTTON */}
-        <TouchableOpacity style={styles.navCenter} onPress={onPressMiddle}>
+        <TouchableOpacity style={[styles.navCenter, { backgroundColor: theme.accent }]} onPress={onPressMiddle}>
           <Image
             source={require("../assets/icons/Golf.png")}
-            style={styles.centerIcon}
+            style={[styles.centerIcon, { tintColor: theme.card }]}
             resizeMode="contain"
           />
         </TouchableOpacity>
@@ -48,10 +51,10 @@ export default function Navbar({ currentTab, onTabPress, onPressMiddle }) {
         >
           <Image
             source={require("../assets/icons/Coach.png")}
-            style={styles.icon}
+            style={[styles.icon, { tintColor: theme.accent }]}
             resizeMode="contain"
           />
-          {currentTab === "coach" && <View style={styles.dot} />}
+          {currentTab === "coach" && <View style={[styles.dot, { backgroundColor: theme.accent }]} />}
         </TouchableOpacity>
 
         {/* SETTINGS */}
@@ -61,10 +64,10 @@ export default function Navbar({ currentTab, onTabPress, onPressMiddle }) {
         >
           <Image
             source={require("../assets/icons/Caddy.png")}
-            style={styles.icon}
+            style={[styles.icon, { tintColor: theme.accent }]}
             resizeMode="contain"
           />
-          {currentTab === "caddie" && <View style={styles.dot} />}
+          {currentTab === "caddie" && <View style={[styles.dot, { backgroundColor: theme.accent }]} />}
         </TouchableOpacity>
       </View>
     </View>

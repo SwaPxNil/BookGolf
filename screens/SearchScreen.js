@@ -12,9 +12,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useCourses } from "../hooks/useCourse";
+import { useTheme } from "../theme/ThemeContext";
 
 export default function SearchScreen({ navigation }) {
   const { width, height } = useWindowDimensions();
+  const { theme, mode } = useTheme();
   const [query, setQuery] = useState("");
   const { data } = useCourses({ retry: false });
 
@@ -30,16 +32,16 @@ export default function SearchScreen({ navigation }) {
   });
 
   return (
-    <SafeAreaView style={[styles.container, { paddingHorizontal: width * 0.06 }]}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { paddingHorizontal: width * 0.06, backgroundColor: theme.bg }]}>
+      <StatusBar style={mode === "dark" ? "light" : "dark"} />
 
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={26} color="#000" />
+          <Ionicons name="arrow-back" size={26} color={theme.icon} />
         </TouchableOpacity>
 
-        <Text style={[styles.headerTitle, { fontSize: width * 0.08 }]}>
+        <Text style={[styles.headerTitle, { fontSize: width * 0.08, color: theme.textPrimary }]}>
           SEARCH COURSES
         </Text>
       </View>
@@ -48,15 +50,16 @@ export default function SearchScreen({ navigation }) {
       <View
         style={[
           styles.searchBox,
-          { height: height * 0.065, borderRadius: width * 0.04 },
+          { height: height * 0.065, borderRadius: width * 0.04, backgroundColor: theme.cardSoft },
         ]}
       >
-        <Ionicons name="search" size={20} color="#555" />
+        <Ionicons name="search" size={20} color={theme.textSecondary} />
         <TextInput
           placeholder="Search golf courses in Nepal"
+          placeholderTextColor={theme.textSecondary}
           value={query}
           onChangeText={setQuery}
-          style={[styles.input, { fontSize: width * 0.04 }]}
+          style={[styles.input, { fontSize: width * 0.04, color: theme.textPrimary }]}
         />
       </View>
 
@@ -71,10 +74,10 @@ export default function SearchScreen({ navigation }) {
           <View
             style={[
               styles.courseCard,
-              { borderRadius: width * 0.05 },
+              { borderRadius: width * 0.05, backgroundColor: theme.card },
             ]}
           >
-            <Text style={[styles.courseText, { fontSize: width * 0.045 }]}>
+            <Text style={[styles.courseText, { fontSize: width * 0.045, color: "#fff" }]}>
               {item?.name ?? item?.course_name ?? "Unnamed course"}
             </Text>
           </View>

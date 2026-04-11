@@ -18,8 +18,10 @@ import Header from "../components/Header";
 import Navbar from "../components/Navbar";
 import { useCoaches } from "../hooks/useCoach";
 import { useMyProfile } from "../hooks/useAuth";
+import { useTheme } from "../theme/ThemeContext";
 
 export default function CoachesScreen({ navigation }) {
+  const { theme, mode } = useTheme();
   const [currentTab, setCurrentTab] = useState("coach");
   const [searchQuery, setSearchQuery] = useState("");
   // Destructure height here as well
@@ -33,24 +35,32 @@ export default function CoachesScreen({ navigation }) {
     : require("../assets/images/Avatar.png");
 
   const coaches = Array.isArray(coachesResponse?.data?.data)
-    ? coachesResponse.data.data.map((coach) => ({
+    ? coachesResponse.data.data.map((coach) => {
+        const numericRating = Number(
+          coach?.rating ?? coach?.average_rating ?? coach?.avg_rating ?? 0
+        );
+
+        return {
         id: coach?._id,
         name: coach?.full_name || "Unnamed Coach",
         experience: `${coach?.experience_years ?? 0} years experience`,
-        rating: Number(coach?.rating ?? 0).toFixed(1),
+        rating: Number.isFinite(numericRating) ? numericRating : 0,
         status:
           Array.isArray(coach?.availability_slots) && coach.availability_slots.length > 0
             ? "available"
             : "busy",
         imageUrl: coach?.profile_img || coach?.image_url || null,
-      }))
+      };
+    })
     : [];
 
   const filtered = coaches.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const topRated = [...filtered].slice(0, 4);
+  const topRated = [...filtered]
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 4);
   const available = filtered.filter((c) => c.status === "available");
 
   const onTabPress = (tab) => navigation.navigate(tab);
@@ -69,8 +79,8 @@ export default function CoachesScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}> 
+      <StatusBar style={mode === "dark" ? "light" : "dark"} />
 
       <TouchableOpacity
         style={[
@@ -91,13 +101,13 @@ export default function CoachesScreen({ navigation }) {
       />
 
       <View style={[styles.searchRow, { marginHorizontal: width * 0.05 }]}>
-        <Ionicons name="search-outline" size={20} color="#333" />
+        <Ionicons name="search-outline" size={20} color={theme.textSecondary} />
         <TextInput
           placeholder="Search"
-          placeholderTextColor="#555"
+          placeholderTextColor={theme.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          style={[styles.searchInput, { width: width * 0.7 }]}
+          style={[styles.searchInput, { width: width * 0.7, color: theme.textPrimary }]}
         />
       </View>
 
@@ -114,6 +124,7 @@ export default function CoachesScreen({ navigation }) {
           coaches={topRated}
           width={width}
           height={height}
+          theme={theme}
           onPress={handleCoachPress}
         />
 
@@ -122,6 +133,7 @@ export default function CoachesScreen({ navigation }) {
           coaches={available}
           width={width}
           height={height}
+          theme={theme}
           onPress={handleCoachPress}
         />
       </ScrollView>
@@ -136,11 +148,11 @@ export default function CoachesScreen({ navigation }) {
 }
 
 // Receive height in props
-const CoachSection = ({ title, coaches, width, height, onPress }) => (
+const CoachSection = ({ title, coaches, width, height, onPress, theme }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.viewAll}>view all</Text>
+      <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>{title}</Text>
+      <Text style={[styles.viewAll, { color: theme.accent }]}>view all</Text>
     </View>
 
     <ScrollView
@@ -188,7 +200,7 @@ const CoachCard = ({ coach, width, height, isFirst, onPress }) => {
 
       <View style={styles.rating}>
         <Ionicons name="star" size={14} color="#FFD700" />
-        <Text style={styles.ratingText}>{coach.rating}</Text>
+        <Text style={styles.ratingText}>{coach.rating.toFixed(1)}</Text>
       </View>
 
       <View style={styles.overlay}>

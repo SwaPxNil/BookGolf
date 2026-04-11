@@ -20,3 +20,8 @@ export const getMyRounds = () => {
 export const getRoundById = (roundId) => {
   return authAxios.get(`/rounds/${roundId}`);
 };
+
+/* UPDATE ROUND SCORECARD */
+export const updateRoundScorecard = (roundId, payload) => {
+  return authAxios.patch(`/rounds/${roundId}/scorecard`, payload);
+};
