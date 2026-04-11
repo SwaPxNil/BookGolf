@@ -13,7 +13,7 @@ export default function TopNavbar({ role }) {
     }`}>
       <div>
         <p className="font-bebas text-xs tracking-[0.35em] text-[#F3D87A]">{isSuperAdmin ? "Platform Command" : "Course Operations"}</p>
-        <h1 className="mt-1 text-[34px] leading-none text-sand">Welcome back, {user?.name || "Admin"}</h1>
+        <h1 className="mt-1 text-[28px] leading-none text-sand sm:text-[30px]">Welcome back, {user?.name || "Admin"}</h1>
       </div>
       <div className="flex items-center gap-4">
         <button className="rounded-[22px] bg-white/10 p-3 text-[#F3D87A]">

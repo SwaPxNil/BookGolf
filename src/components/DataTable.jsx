@@ -8,7 +8,7 @@ export default function DataTable({ columns, data }) {
           <thead className="bg-[linear-gradient(90deg,#262B27_0%,#2E4A37_70%,#415634_100%)] text-sand">
             <tr>
               {columns.map((column) => (
-                <th key={column.key} className="font-bebas px-5 py-4 text-left text-xs tracking-[0.22em] text-[#F3D87A]">
+                <th key={column.key} className="px-5 py-4 text-left text-sm font-semibold tracking-[0.06em] text-[#F3D87A]">
                   {column.header}
                 </th>
               ))}

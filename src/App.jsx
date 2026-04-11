@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { FaBook, FaCalendarCheck, FaChalkboardTeacher, FaFlag, FaGolfBall, FaHistory, FaHome, FaIdBadge, FaUserCircle } from "react-icons/fa";
+import { FaBook, FaCalendarCheck, FaChalkboardTeacher, FaFlag, FaGolfBall, FaHistory, FaHome, FaIdBadge, FaUserCircle, FaUsersCog } from "react-icons/fa";
 import AdminLayout from "./components/AdminLayout";
 import { useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/auth/LoginPage";
@@ -10,6 +10,7 @@ import CourseAdminLessonsPage from "./pages/courseAdmin/LessonsPage";
 import CourseAdminProfilePage from "./pages/courseAdmin/ProfilePage";
 import CourseAdminCoachesPage from "./pages/courseAdmin/CoachesPage";
 import SuperAdminActivitiesPage from "./pages/superAdmin/ActivitiesPage";
+import SuperAdminCourseAdminsPage from "./pages/superAdmin/CourseAdminsPage";
 import SuperAdminCoursesPage from "./pages/superAdmin/CoursesPage";
 import SuperAdminDashboardPage from "./pages/superAdmin/DashboardPage";
 import SuperAdminProfilePage from "./pages/superAdmin/ProfilePage";
@@ -26,12 +27,16 @@ const courseAdminSidebar = [
 const superAdminSidebar = [
   { label: "Dashboard", path: "/superadmin/dashboard", icon: FaHome },
   { label: "Courses", path: "/superadmin/courses", icon: FaFlag },
+  { label: "Course Admins", path: "/superadmin/course-admins", icon: FaUsersCog },
   { label: "Admin Activities", path: "/superadmin/activities", icon: FaHistory },
   { label: "Profile", path: "/superadmin/profile", icon: FaIdBadge },
 ];
 
 function ProtectedRoute({ role, children }) {
-  const { user } = useAuth();
+  const { user, authLoading } = useAuth();
+  if (authLoading) {
+    return <div className="font-abel p-6 text-base text-ink/70">Checking session...</div>;
+  }
   if (!user) return <Navigate to="/login" replace />;
   if (role && user.role !== role) return <Navigate to={user.role === "superadmin" ? "/superadmin/dashboard" : "/dashboard"} replace />;
   return children;
@@ -61,6 +66,7 @@ export default function App() {
 
       <Route path="/superadmin/dashboard" element={<ProtectedRoute role="superadmin"><SuperAdminShell><SuperAdminDashboardPage /></SuperAdminShell></ProtectedRoute>} />
       <Route path="/superadmin/courses" element={<ProtectedRoute role="superadmin"><SuperAdminShell><SuperAdminCoursesPage /></SuperAdminShell></ProtectedRoute>} />
+      <Route path="/superadmin/course-admins" element={<ProtectedRoute role="superadmin"><SuperAdminShell><SuperAdminCourseAdminsPage /></SuperAdminShell></ProtectedRoute>} />
       <Route path="/superadmin/activities" element={<ProtectedRoute role="superadmin"><SuperAdminShell><SuperAdminActivitiesPage /></SuperAdminShell></ProtectedRoute>} />
       <Route path="/superadmin/profile" element={<ProtectedRoute role="superadmin"><SuperAdminShell><SuperAdminProfilePage /></SuperAdminShell></ProtectedRoute>} />
 
