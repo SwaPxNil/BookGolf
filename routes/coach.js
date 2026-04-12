@@ -21,7 +21,7 @@ router
   .get(optionalAuthenticate, getCoaches)
   .post(
     authenticate,
-    authorize('COURSE_ADMIN'),
+    authorize('COURSE_ADMIN', 'SUPER_ADMIN'),
     uploadSingleImage('image'),
     parseJsonFields(['availability_slots', 'availabilitySlots', 'lessons']),
     validate(createCoachSchema),

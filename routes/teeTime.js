@@ -16,7 +16,7 @@ const { createTeeTimeSchema } = require('../utils/validators/teeTime.validator')
 router
     .route('/')
     .get(getTeeTimesForCourse)
-    .post(authenticate, authorize('COURSE_ADMIN'), validate(createTeeTimeSchema), createTeeTime);
+  .post(authenticate, authorize('COURSE_ADMIN', 'SUPER_ADMIN'), validate(createTeeTimeSchema), createTeeTime);
 
 router
     .route('/book')

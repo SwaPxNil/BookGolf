@@ -6,7 +6,11 @@ const { uploadImageBuffer } = require('../utils/cloudinaryUpload');
 // @access  Private (COURSE_ADMIN)
 const createCourse = async (req, res, next) => {
   try {
-    const courseData = { ...req.body, created_by: req.user.id };
+    const courseData = { ...req.body };
+
+    if (req.user.role === 'COURSE_ADMIN') {
+      courseData.created_by = req.user.id;
+    }
 
     if (req.file) {
       const uploadResult = await uploadImageBuffer(req.file, 'courses');

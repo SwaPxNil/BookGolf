@@ -253,8 +253,8 @@ const rateBookingByUser = async (bookingId, userId, ratingValue) => {
     return null;
   }
 
-  if (booking.status !== 'CONFIRMED') {
-    const error = new Error('Only confirmed bookings can be rated');
+  if (booking.status !== 'COMPLETED') {
+    const error = new Error('Only completed bookings can be rated');
     error.statusCode = 400;
     throw error;
   }
@@ -307,27 +307,6 @@ const rateBookingByUser = async (bookingId, userId, ratingValue) => {
   return withPayment;
 };
 
-const getAllBookings = async (options = {}) => {
-  const { limit, actor } = options;
-  const filters = {};
-
-  if (actor?.role === 'COURSE_ADMIN') {
-    const accessibleCourseIds = await getAccessibleCourseIds(actor);
-    filters.course_id = { $in: accessibleCourseIds };
-  }
-
-  const query = Booking.find(filters)
-    .sort({ created_at: -1 })
-    .populate(bookingPopulate);
-
-  if (typeof limit === 'number' && limit > 0) {
-    query.limit(limit);
-  }
-
-  const bookings = await query;
-  return bookings.map(enrichBooking);
-};
-
 const getAccessibleCourseIds = async (actor) => {
   if (!actor) {
     return [];
@@ -345,7 +324,70 @@ const getAccessibleCourseIds = async (actor) => {
   return courses.map((course) => String(course._id));
 };
 
-const canManageBooking = (booking, actor, accessibleCourseIds) => {
+const getAllBookings = async (options = {}) => {
+  const { limit, actor } = options;
+  const filters = {};
+
+  if (actor?.role === 'COURSE_ADMIN') {
+    const accessibleCourseIds = await getAccessibleCourseIds(actor);
+    const [teeTimes, coaches, caddies] = await Promise.all([
+      TeeTime.find({ course_id: { $in: accessibleCourseIds } }).select('_id').lean(),
+      Coach.find({ course_id: { $in: accessibleCourseIds } }).select('_id').lean(),
+      Caddie.find({ course_id: { $in: accessibleCourseIds } }).select('_id').lean(),
+    ]);
+
+    const teeTimeIds = teeTimes.map((item) => String(item._id));
+    const coachIds = coaches.map((item) => String(item._id));
+    const caddieIds = caddies.map((item) => String(item._id));
+
+    filters.$or = [
+      { course_id: { $in: accessibleCourseIds } },
+      { booking_type: 'TEE_TIME', tee_time_id: { $in: teeTimeIds } },
+      { booking_type: 'COACH', coach_id: { $in: coachIds } },
+      { booking_type: 'CADDIE', caddie_id: { $in: caddieIds } },
+    ];
+  }
+
+  const query = Booking.find(filters)
+    .sort({ created_at: -1 })
+    .populate(bookingPopulate);
+
+  if (typeof limit === 'number' && limit > 0) {
+    query.limit(limit);
+  }
+
+  const bookings = await query;
+  return bookings.map(enrichBooking);
+};
+
+const resolveBookingCourseId = async (booking) => {
+  if (!booking) {
+    return null;
+  }
+
+  if (booking.course_id) {
+    return String(booking.course_id);
+  }
+
+  if (booking.booking_type === 'TEE_TIME' && booking.tee_time_id) {
+    const teeTime = await TeeTime.findById(booking.tee_time_id).select('course_id').lean();
+    return teeTime?.course_id ? String(teeTime.course_id) : null;
+  }
+
+  if (booking.booking_type === 'COACH' && booking.coach_id) {
+    const coach = await Coach.findById(booking.coach_id).select('course_id').lean();
+    return coach?.course_id ? String(coach.course_id) : null;
+  }
+
+  if (booking.booking_type === 'CADDIE' && booking.caddie_id) {
+    const caddie = await Caddie.findById(booking.caddie_id).select('course_id').lean();
+    return caddie?.course_id ? String(caddie.course_id) : null;
+  }
+
+  return null;
+};
+
+const canManageBooking = async (booking, actor, accessibleCourseIds) => {
   if (!booking || !actor) {
     return false;
   }
@@ -358,7 +400,7 @@ const canManageBooking = (booking, actor, accessibleCourseIds) => {
     return false;
   }
 
-  const bookingCourseId = booking.course_id ? String(booking.course_id) : null;
+  const bookingCourseId = await resolveBookingCourseId(booking);
   if (!bookingCourseId) {
     return false;
   }
@@ -373,7 +415,7 @@ const updateBookingByAdmin = async (bookingId, payload, actor) => {
   }
 
   const accessibleCourseIds = await getAccessibleCourseIds(actor);
-  if (!canManageBooking(booking, actor, accessibleCourseIds)) {
+  if (!(await canManageBooking(booking, actor, accessibleCourseIds))) {
     const forbidden = new Error('Not authorized to update this booking');
     forbidden.statusCode = 403;
     throw forbidden;
@@ -421,7 +463,7 @@ const cancelBookingByAdmin = async (bookingId, payload, actor) => {
   }
 
   const accessibleCourseIds = await getAccessibleCourseIds(actor);
-  if (!canManageBooking(booking, actor, accessibleCourseIds)) {
+  if (!(await canManageBooking(booking, actor, accessibleCourseIds))) {
     const forbidden = new Error('Not authorized to cancel this booking');
     forbidden.statusCode = 403;
     throw forbidden;
@@ -444,7 +486,7 @@ const deleteBookingByAdmin = async (bookingId, actor) => {
   }
 
   const accessibleCourseIds = await getAccessibleCourseIds(actor);
-  if (!canManageBooking(booking, actor, accessibleCourseIds)) {
+  if (!(await canManageBooking(booking, actor, accessibleCourseIds))) {
     const forbidden = new Error('Not authorized to delete this booking');
     forbidden.statusCode = 403;
     throw forbidden;

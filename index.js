@@ -2,10 +2,11 @@ const morgan = require('morgan');
 const cors = require('cors');
 const express = require('express');
 const dotenv = require('dotenv');
+const path = require('path');
 const connectDB = require('./utils/config/db');
 
 // Load env vars
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 // Connect to database
 connectDB();

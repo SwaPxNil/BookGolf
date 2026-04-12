@@ -245,3 +245,40 @@ Use `GET /api/coaches/:id/lessons` to fetch the updated lesson values.
 -   2FA email is currently mocked using Nodemailer with Ethereal Email for testing purposes.
 -   Tee Time booking uses MongoDB transactions to prevent double booking.
 -   Handicap calculation logic is a simplified example.
+
+## Sandbox Payment Integration (eSewa + Khalti)
+
+The backend supports advance-payment checkout and verification for both eSewa and Khalti sandbox.
+
+### Required Environment Variables
+
+```ini
+# Optional. If omitted, backend derives callback URL from request host.
+PAYMENT_CALLBACK_BASE_URL=http://localhost:5000
+
+# eSewa sandbox defaults are already built in.
+ESEWA_SANDBOX_URL=https://rc-epay.esewa.com.np/api/epay/main/v2/form
+ESEWA_PRODUCT_CODE=EPAYTEST
+ESEWA_SECRET_KEY=8gBm/:&EnhH.1/q
+
+# Khalti sandbox
+KHALTI_INITIATE_URL=https://a.khalti.com/api/v2/epayment/initiate/
+KHALTI_LOOKUP_URL=https://a.khalti.com/api/v2/epayment/lookup/
+KHALTI_SECRET_KEY=<your_test_secret_key_from_test-admin.khalti.com>
+```
+
+### Backend API Flow
+
+1. Initiate payment:
+	- `POST /api/payments/bookings/advance/initiate`
+	- Body includes `bookingType`, `paymentMethod`, and booking payload (`teeTimeId`, or `coachId + lessonId + slot`, or `caddieId + slot + totalAmount`).
+
+2. Redirect user to provider checkout:
+	- eSewa: open `checkout.checkoutUrl` (auto-submitting form endpoint).
+	- Khalti: open `checkout.paymentUrl`.
+
+3. Verify and finalize booking:
+	- eSewa: `POST /api/payments/esewa/verify` with `{ paymentId }`.
+	- Khalti: `POST /api/payments/khalti/verify` with `{ paymentId, pidx }`.
+
+Booking is confirmed only after successful gateway verification.

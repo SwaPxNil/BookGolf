@@ -22,7 +22,7 @@ router
   .get(getCourses)
   .post(
     authenticate,
-    authorize('COURSE_ADMIN'),
+    authorize('COURSE_ADMIN', 'SUPER_ADMIN'),
     uploadSingleImage('image'),
     parseJsonFields(['hole_layouts']),
     validate(createCourseSchema),

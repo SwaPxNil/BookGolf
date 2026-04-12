@@ -58,7 +58,7 @@ const BookingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['CONFIRMED', 'CANCELLED'],
+    enum: ['CONFIRMED', 'COMPLETED', 'CANCELLED'],
     default: 'CONFIRMED',
   },
   user_rating: {

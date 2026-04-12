@@ -20,7 +20,7 @@ router
   .get(optionalAuthenticate, getCaddies)
   .post(
     authenticate,
-    authorize('COURSE_ADMIN'),
+    authorize('COURSE_ADMIN', 'SUPER_ADMIN'),
     uploadSingleImage('image'),
     parseJsonFields(['availability_slots', 'availabilitySlots']),
     validate(createCaddieSchema),

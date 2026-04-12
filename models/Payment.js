@@ -14,7 +14,7 @@ const PaymentSchema = new mongoose.Schema({
   booking_id: {
     type: String,
     ref: 'Booking',
-    required: [true, 'Please add a booking ID'],
+    default: null,
   },
   booking_type: {
     type: String,
@@ -38,6 +38,19 @@ const PaymentSchema = new mongoose.Schema({
     type: String,
     enum: ['PENDING', 'PAID', 'FAILED'],
     default: 'PENDING',
+  },
+  provider_transaction_id: {
+    type: String,
+  },
+  verification_reference: {
+    type: String,
+  },
+  verified_at: {
+    type: Date,
+  },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {},
   },
   created_at: {
     type: Date,
