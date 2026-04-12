@@ -11,6 +11,8 @@ import {
   RefreshControl,
   Image,
   Alert,
+  Linking,
+  AppState,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,7 +20,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useCoachAvailability } from "../hooks/useCoach";
 import BookingPaymentModal from "../components/BookingPaymentModal";
-import { useProcessAdvanceBookingPayment } from "../hooks/usePayment";
+import {
+  useInitiateAdvanceBookingPayment,
+  useVerifyEsewaAdvancePayment,
+  useVerifyKhaltiAdvancePayment,
+} from "../hooks/usePayment";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -27,6 +33,7 @@ const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.6;
 
 export default function LessonBookingScreen() {
   const navigation = useNavigation();
+  const appStateRef = useRef(AppState.currentState);
   const route = useRoute();
   const coachId = route?.params?.coachId || route?.params?.coach?.id || route?.params?.coach?._id;
   const {
@@ -34,20 +41,29 @@ export default function LessonBookingScreen() {
     isLoading: availabilityLoading,
     refetch: refetchAvailability,
   } = useCoachAvailability(coachId, { retry: false });
-  const bookCoachLessonMutation = useProcessAdvanceBookingPayment({
-    onSuccess: () => {
-      setPaymentModalVisible(false);
-      setConfirmationVisible(true);
-      setSelectedSlot("");
-    },
+  const initiatePaymentMutation = useInitiateAdvanceBookingPayment({
     onError: (error) => {
       Alert.alert(
-        "Booking failed",
+        "Payment initiation failed",
         error?.response?.data?.error ||
           error?.response?.data?.msg ||
           error?.message ||
-          "Unable to complete the booking."
+          "Unable to start the payment process."
       );
+    },
+  });
+  const verifyEsewaMutation = useVerifyEsewaAdvancePayment({
+    onSuccess: () => {
+      setPendingGatewayPayment(null);
+      setConfirmationVisible(true);
+      setSelectedSlot("");
+    },
+  });
+  const verifyKhaltiMutation = useVerifyKhaltiAdvancePayment({
+    onSuccess: () => {
+      setPendingGatewayPayment(null);
+      setConfirmationVisible(true);
+      setSelectedSlot("");
     },
   });
   
@@ -81,6 +97,7 @@ export default function LessonBookingScreen() {
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [confirmationVisible, setConfirmationVisible] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("ESEWA");
+  const [pendingGatewayPayment, setPendingGatewayPayment] = useState(null);
 
   const animState = useRef(new Animated.Value(0)).current;
 
@@ -194,17 +211,108 @@ export default function LessonBookingScreen() {
     setPaymentModalVisible(true);
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     const resolvedLessonId = lesson?.lessonId || lesson?.id || lesson?._id;
 
-    bookCoachLessonMutation.mutate({
-      bookingType: "COACH",
-      paymentMethod,
-      coachId,
-      lessonId: resolvedLessonId,
-      slot: selectedSlot,
-    });
+    try {
+      const response = await initiatePaymentMutation.mutateAsync({
+        bookingType: "COACH",
+        paymentMethod,
+        coachId,
+        lessonId: resolvedLessonId,
+        slot: selectedSlot,
+      });
+
+      const checkout = response?.data?.data?.checkout || {};
+      const paymentId = response?.data?.data?.paymentId;
+
+      if (!paymentId) {
+        throw new Error("Payment ID was not returned by server");
+      }
+
+      const targetUrl = checkout?.checkoutUrl || checkout?.paymentUrl;
+      if (!targetUrl) {
+        throw new Error("Payment URL is missing");
+      }
+
+      setPaymentModalVisible(false);
+      setPendingGatewayPayment({
+        paymentId,
+        method: paymentMethod,
+        pidx: checkout?.pidx || null,
+      });
+
+      await Linking.openURL(targetUrl);
+
+      Alert.alert(
+        "Complete payment in sandbox",
+        "After completing payment in browser, return to this app and tap VERIFY PAYMENT.",
+      );
+    } catch (error) {
+      Alert.alert(
+        "Payment failed",
+        error?.response?.data?.error ||
+          error?.response?.data?.msg ||
+          error?.message ||
+          "Unable to process payment."
+      );
+    }
   };
+
+  const verifyPendingPayment = async ({ silent = false } = {}) => {
+    if (!pendingGatewayPayment?.paymentId) {
+      if (!silent) {
+        Alert.alert("No pending payment", "Please start a payment first.");
+      }
+      return;
+    }
+
+    try {
+      if (pendingGatewayPayment.method === "ESEWA") {
+        await verifyEsewaMutation.mutateAsync({ paymentId: pendingGatewayPayment.paymentId });
+      } else {
+        await verifyKhaltiMutation.mutateAsync({
+          paymentId: pendingGatewayPayment.paymentId,
+          pidx: pendingGatewayPayment.pidx || undefined,
+        });
+      }
+    } catch (error) {
+      if (!silent) {
+        Alert.alert(
+          "Verification pending",
+          error?.response?.data?.error ||
+            error?.response?.data?.msg ||
+            error?.message ||
+            "Payment is not verified yet."
+        );
+      }
+    }
+  };
+
+  const handleVerifyPayment = () => verifyPendingPayment({ silent: false });
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      const wasInBackground = appStateRef.current.match(/inactive|background/);
+      const isActive = nextState === "active";
+
+      if (
+        wasInBackground
+        && isActive
+        && pendingGatewayPayment?.paymentId
+        && !verifyEsewaMutation.isPending
+        && !verifyKhaltiMutation.isPending
+      ) {
+        verifyPendingPayment({ silent: true });
+      }
+
+      appStateRef.current = nextState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [pendingGatewayPayment, verifyEsewaMutation.isPending, verifyKhaltiMutation.isPending]);
 
   const handleConfirmationClose = async () => {
     setConfirmationVisible(false);
@@ -362,16 +470,31 @@ export default function LessonBookingScreen() {
           <TouchableOpacity
             style={[
               styles.actionBtn,
-              (!selectedSlot || bookCoachLessonMutation.isPending) && styles.actionBtnDisabled,
+              (!selectedSlot || initiatePaymentMutation.isPending) && styles.actionBtnDisabled,
             ]}
             onPress={handleBookNow}
-            disabled={!selectedSlot || bookCoachLessonMutation.isPending}
+            disabled={!selectedSlot || initiatePaymentMutation.isPending}
           >
             <Text style={styles.actionBtnText}>
-              {bookCoachLessonMutation.isPending ? "BOOKING..." : "BOOK NOW"}
+              {initiatePaymentMutation.isPending ? "PROCESSING..." : "BOOK NOW"}
             </Text>
           </TouchableOpacity>
         </View>
+
+        {pendingGatewayPayment?.paymentId ? (
+          <View style={styles.verifyRow}>
+            <Text style={styles.verifyHint}>Payment initiated via {pendingGatewayPayment.method}. Return after payment and verify.</Text>
+            <TouchableOpacity
+              style={[styles.verifyBtn, (verifyEsewaMutation.isPending || verifyKhaltiMutation.isPending) && styles.actionBtnDisabled]}
+              onPress={handleVerifyPayment}
+              disabled={verifyEsewaMutation.isPending || verifyKhaltiMutation.isPending}
+            >
+              <Text style={styles.verifyBtnText}>
+                {(verifyEsewaMutation.isPending || verifyKhaltiMutation.isPending) ? "VERIFYING..." : "VERIFY PAYMENT"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
       </Animated.View>
 
@@ -385,7 +508,7 @@ export default function LessonBookingScreen() {
         onSelectMethod={setPaymentMethod}
         onConfirm={handleConfirmPayment}
         onClose={() => setPaymentModalVisible(false)}
-        isSubmitting={bookCoachLessonMutation.isPending}
+        isSubmitting={initiatePaymentMutation.isPending}
       />
 
       <BookingPaymentModal
@@ -736,5 +859,27 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 22,
     fontFamily: "Bebas",
+  },
+  verifyRow: {
+    marginTop: 10,
+    paddingHorizontal: 25,
+    gap: 10,
+  },
+  verifyHint: {
+    color: COLORS.lightGray,
+    fontFamily: "Abel",
+    fontSize: 13,
+  },
+  verifyBtn: {
+    backgroundColor: "#3E5C45",
+    borderRadius: 22,
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  verifyBtnText: {
+    color: COLORS.white,
+    fontFamily: "Bebas",
+    fontSize: 18,
+    letterSpacing: 0.6,
   },
 });

@@ -9,6 +9,7 @@ import {
   ImageBackground,
   Dimensions,
   Image,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -87,6 +88,8 @@ export default function MyBookingsScreen() {
   const [activeTab, setActiveTab] = useState(route?.params?.initialTab || "courses");
   const [refreshing, setRefreshing] = useState(false);
   const [scheduledReminderKeys, setScheduledReminderKeys] = useState(new Set());
+  const [dismissedPromptIds, setDismissedPromptIds] = useState(new Set());
+  const [promptBooking, setPromptBooking] = useState(null);
 
   const { data: bookingsResponse, isLoading, isError, refetch } = useMyBookings({ retry: false });
 
@@ -102,6 +105,18 @@ export default function MyBookingsScreen() {
   }, [allBookings, activeTab]);
 
   const heroImage = filteredBookings[0] ? resolveImageSource(filteredBookings[0]) : FALLBACKS.course;
+
+  const isRatePromptEligible = (booking) => {
+    if (!booking) return false;
+
+    const isTargetType = ["COACH", "CADDIE"].includes(String(booking?.booking_type || "").toUpperCase());
+    const isCompleted = String(booking?.status || "").toUpperCase() === "COMPLETED";
+    const isUnrated = Number(booking?.user_rating || 0) <= 0;
+    const slotDate = new Date(booking?.slot || booking?.booking_datetime || booking?.created_at);
+    const isPast = !Number.isNaN(slotDate.getTime()) && slotDate.getTime() <= Date.now();
+
+    return isTargetType && isCompleted && isUnrated && isPast;
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -119,6 +134,20 @@ export default function MyBookingsScreen() {
       mounted = false;
     };
   }, [allBookings.length]);
+
+  useEffect(() => {
+    const sorted = [...allBookings].sort((a, b) => {
+      const aDate = new Date(a?.slot || a?.booking_datetime || a?.created_at || 0).getTime();
+      const bDate = new Date(b?.slot || b?.booking_datetime || b?.created_at || 0).getTime();
+      return bDate - aDate;
+    });
+
+    const nextPromptBooking = sorted.find(
+      (booking) => isRatePromptEligible(booking) && !dismissedPromptIds.has(String(booking?._id))
+    );
+
+    setPromptBooking(nextPromptBooking || null);
+  }, [allBookings, dismissedPromptIds]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -218,6 +247,57 @@ export default function MyBookingsScreen() {
           ))}
         </ScrollView>
       </View>
+
+      <Modal
+        visible={Boolean(promptBooking)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (promptBooking?._id) {
+            setDismissedPromptIds((current) => new Set([...current, String(promptBooking._id)]));
+          }
+          setPromptBooking(null);
+        }}
+      >
+        <View style={styles.promptBackdrop}>
+          <View style={styles.promptCard}>
+            <Text style={styles.promptEyebrow}>EXPERIENCE COMPLETED</Text>
+            <Text style={styles.promptTitle}>Rate Your Experience</Text>
+            <Text style={styles.promptDescription}>
+              Your {String(promptBooking?.booking_type || "").toLowerCase()} session is completed. Please rate the experience to improve service quality.
+            </Text>
+            <View style={styles.promptActions}>
+              <TouchableOpacity
+                style={styles.promptSecondaryBtn}
+                onPress={() => {
+                  if (promptBooking?._id) {
+                    setDismissedPromptIds((current) => new Set([...current, String(promptBooking._id)]));
+                  }
+                  setPromptBooking(null);
+                }}
+              >
+                <Text style={styles.promptSecondaryText}>LATER</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.promptPrimaryBtn}
+                onPress={() => {
+                  const bookingToRate = promptBooking;
+                  if (bookingToRate?._id) {
+                    setDismissedPromptIds((current) => new Set([...current, String(bookingToRate._id)]));
+                  }
+                  setPromptBooking(null);
+                  navigation.navigate("BookingDetails", {
+                    bookingId: bookingToRate?._id,
+                    booking: bookingToRate,
+                  });
+                }}
+              >
+                <Text style={styles.promptPrimaryText}>RATE NOW</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -369,5 +449,69 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: "center",
     marginTop: 18,
+  },
+  promptBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(10,14,12,0.62)",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  promptCard: {
+    backgroundColor: "#F3ECDD",
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    borderWidth: 1,
+    borderColor: "rgba(46, 74, 55, 0.12)",
+  },
+  promptEyebrow: {
+    color: "#5F7248",
+    fontFamily: "Bebas",
+    fontSize: 18,
+    letterSpacing: 1,
+  },
+  promptTitle: {
+    color: "#1F241D",
+    fontFamily: "Bebas",
+    fontSize: 34,
+    marginTop: 4,
+  },
+  promptDescription: {
+    color: "#4F554A",
+    fontFamily: "Abel",
+    fontSize: 17,
+    lineHeight: 22,
+    marginTop: 8,
+  },
+  promptActions: {
+    flexDirection: "row",
+    marginTop: 18,
+  },
+  promptSecondaryBtn: {
+    flex: 1,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#8B9580",
+    paddingVertical: 11,
+    alignItems: "center",
+    marginRight: 10,
+  },
+  promptSecondaryText: {
+    color: "#55604F",
+    fontFamily: "Bebas",
+    fontSize: 20,
+  },
+  promptPrimaryBtn: {
+    flex: 1,
+    borderRadius: 999,
+    backgroundColor: "#798D3D",
+    paddingVertical: 11,
+    alignItems: "center",
+  },
+  promptPrimaryText: {
+    color: "#FFF",
+    fontFamily: "Bebas",
+    fontSize: 20,
+    letterSpacing: 0.4,
   },
 });

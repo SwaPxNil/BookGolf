@@ -160,7 +160,7 @@ export default function BookingDetailsScreen() {
     const dt = new Date(slotDate);
     return !Number.isNaN(dt.getTime()) && dt.getTime() < Date.now();
   })();
-  const isRateable = booking?.status === "CONFIRMED" && ["COACH", "CADDIE"].includes(booking?.booking_type) && isPastBooking;
+  const isRateable = booking?.status === "COMPLETED" && ["COACH", "CADDIE"].includes(booking?.booking_type) && isPastBooking;
   const existingRating = Number(booking?.user_rating || 0);
   const selectedRating = ratingValue || existingRating;
 
@@ -286,13 +286,13 @@ export default function BookingDetailsScreen() {
             <Text style={styles.modalTitle}>Reservation cancelled</Text>
             <Text style={styles.modalDescription}>A cancellation confirmation email has been sent to your registered email.</Text>
             <TouchableOpacity
-              style={[styles.modalPrimary, { marginTop: 12 }]}
+              style={styles.modalPrimarySingle}
               onPress={() => {
                 setShowCancelledModal(false);
                 navigation.navigate("MyBookings");
               }}
             >
-              <Text style={styles.modalPrimaryText}>DONE</Text>
+              <Text style={styles.modalPrimaryText}>OK</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -508,6 +508,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#798D3D",
     paddingVertical: 11,
     alignItems: "center",
+  },
+  modalPrimarySingle: {
+    marginTop: 12,
+    borderRadius: 999,
+    backgroundColor: "#798D3D",
+    minHeight: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
   },
   modalPrimaryText: {
     color: "#FFF",
