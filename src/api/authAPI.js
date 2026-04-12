@@ -1,6 +1,25 @@
 import apiClient from "./apiClient";
 
 const unwrap = (response) => response?.data?.data ?? response?.data;
+const isFile = (value) => typeof File !== "undefined" && value instanceof File;
+
+const toProfileRequestPayload = (payload = {}) => {
+	const imageFile = payload?.imageFile || (isFile(payload?.image) ? payload.image : null);
+
+	if (!imageFile) {
+		return payload;
+	}
+
+	const formData = new FormData();
+	Object.entries(payload).forEach(([key, value]) => {
+		if (key === "imageFile") return;
+		if (typeof value === "undefined" || value === null || value === "") return;
+		formData.append(key, String(value));
+	});
+
+	formData.append("image", imageFile);
+	return formData;
+};
 
 export async function login(payload) {
 	const response = await apiClient.post("/auth/login", payload);
@@ -23,6 +42,6 @@ export async function getMyProfile() {
 }
 
 export async function updateMyProfile(payload) {
-	const response = await apiClient.put("/auth/me", payload);
+	const response = await apiClient.put("/auth/me", toProfileRequestPayload(payload));
 	return unwrap(response);
 }

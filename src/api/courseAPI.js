@@ -21,6 +21,8 @@ const normalizeCourse = (course) => ({
   holeLayouts: Array.isArray(course?.hole_layouts) ? course.hole_layouts : [],
 });
 
+const isFile = (value) => typeof File !== "undefined" && value instanceof File;
+
 const toCoursePayload = (course) => {
   const assignmentValue = hasOwn(course, "createdBy")
     ? course.createdBy
@@ -43,6 +45,30 @@ const toCoursePayload = (course) => {
   };
 };
 
+const toCourseRequestPayload = (course = {}) => {
+  const payload = toCoursePayload(course);
+  const imageFile = course?.imageFile || (isFile(course?.image) ? course.image : null);
+
+  if (!imageFile) {
+    return payload;
+  }
+
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (typeof value === "undefined" || value === null || value === "") return;
+
+    if (Array.isArray(value) || (typeof value === "object" && !(value instanceof Date))) {
+      formData.append(key, JSON.stringify(value));
+      return;
+    }
+
+    formData.append(key, String(value));
+  });
+
+  formData.append("image", imageFile);
+  return formData;
+};
+
 export async function getCourses() {
   const response = await apiClient.get("/courses");
   return (unwrap(response) || []).map(normalizeCourse);
@@ -54,12 +80,12 @@ export async function getCourseById(id) {
 }
 
 export async function createCourse(payload) {
-  const response = await apiClient.post("/courses", toCoursePayload(payload));
+  const response = await apiClient.post("/courses", toCourseRequestPayload(payload));
   return normalizeCourse(unwrap(response));
 }
 
 export async function updateCourse(id, payload) {
-  const response = await apiClient.put(`/courses/${id}`, toCoursePayload(payload));
+  const response = await apiClient.put(`/courses/${id}`, toCourseRequestPayload(payload));
   return normalizeCourse(unwrap(response));
 }
 

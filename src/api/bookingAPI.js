@@ -116,34 +116,10 @@ export async function updateBooking(id, payload) {
 }
 
 export async function cancelBooking(id, payload = {}) {
-	const bookingType = String(payload?.bookingType || "").toUpperCase();
-
-	if (isCoachType(bookingType)) {
-		await apiClient.delete(`/coach-lessons/${id}`);
-		return { id, status: "CANCELLED" };
-	}
-
-	if (isCaddieType(bookingType)) {
-		await apiClient.delete(`/caddies/book/${id}`);
-		return { id, status: "CANCELLED" };
-	}
-
 	const response = await apiClient.patch(`/bookings/${id}/cancel`, payload);
 	return normalizeBooking(unwrap(response));
 }
 
 export async function deleteBooking(id, options = {}) {
-	const bookingType = String(options?.bookingType || "").toUpperCase();
-
-	if (isCoachType(bookingType)) {
-		await apiClient.delete(`/coach-lessons/${id}`);
-		return;
-	}
-
-	if (isCaddieType(bookingType)) {
-		await apiClient.delete(`/caddies/book/${id}`);
-		return;
-	}
-
 	await apiClient.delete(`/bookings/${id}`);
 }

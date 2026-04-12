@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { FaBook, FaCalendarCheck, FaChalkboardTeacher, FaFlag, FaGolfBall, FaHistory, FaHome, FaIdBadge, FaUserCircle, FaUsersCog } from "react-icons/fa";
+import { FaBook, FaCalendarCheck, FaChalkboardTeacher, FaClock, FaFlag, FaGolfBall, FaHistory, FaHome, FaIdBadge, FaUserCircle, FaUsersCog } from "react-icons/fa";
 import AdminLayout from "./components/AdminLayout";
 import { useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/auth/LoginPage";
@@ -9,6 +9,7 @@ import CourseAdminDashboardPage from "./pages/courseAdmin/DashboardPage";
 import CourseAdminLessonsPage from "./pages/courseAdmin/LessonsPage";
 import CourseAdminProfilePage from "./pages/courseAdmin/ProfilePage";
 import CourseAdminCoachesPage from "./pages/courseAdmin/CoachesPage";
+import CourseAdminTeeTimesPage from "./pages/courseAdmin/TeeTimesPage";
 import SuperAdminActivitiesPage from "./pages/superAdmin/ActivitiesPage";
 import SuperAdminCourseAdminsPage from "./pages/superAdmin/CourseAdminsPage";
 import SuperAdminCoursesPage from "./pages/superAdmin/CoursesPage";
@@ -21,6 +22,7 @@ const courseAdminSidebar = [
   { label: "Lessons", path: "/lessons", icon: FaBook },
   { label: "Caddies", path: "/caddies", icon: FaGolfBall },
   { label: "Bookings", path: "/bookings", icon: FaCalendarCheck },
+  { label: "Tee Times", path: "/tee-times", icon: FaClock },
   { label: "Profile", path: "/profile", icon: FaUserCircle },
 ];
 
@@ -62,6 +64,7 @@ export default function App() {
       <Route path="/caddies" element={<ProtectedRoute role="courseAdmin"><CourseAdminShell><CourseAdminCaddiesPage /></CourseAdminShell></ProtectedRoute>} />
       <Route path="/lessons" element={<ProtectedRoute role="courseAdmin"><CourseAdminShell><CourseAdminLessonsPage /></CourseAdminShell></ProtectedRoute>} />
       <Route path="/bookings" element={<ProtectedRoute role="courseAdmin"><CourseAdminShell><CourseAdminBookingsPage /></CourseAdminShell></ProtectedRoute>} />
+      <Route path="/tee-times" element={<ProtectedRoute role="courseAdmin"><CourseAdminShell><CourseAdminTeeTimesPage /></CourseAdminShell></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute role="courseAdmin"><CourseAdminShell><CourseAdminProfilePage /></CourseAdminShell></ProtectedRoute>} />
 
       <Route path="/superadmin/dashboard" element={<ProtectedRoute role="superadmin"><SuperAdminShell><SuperAdminDashboardPage /></SuperAdminShell></ProtectedRoute>} />

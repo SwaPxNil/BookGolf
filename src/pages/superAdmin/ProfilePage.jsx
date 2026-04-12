@@ -7,6 +7,7 @@ export default function SuperAdminProfilePage() {
     fullName: "",
     email: "",
     image: "",
+    imageFile: null,
     role: "SUPER_ADMIN",
   });
   const [loading, setLoading] = useState(true);
@@ -20,6 +21,7 @@ export default function SuperAdminProfilePage() {
         fullName: profile?.full_name || "",
         email: profile?.email || "",
         image: profile?.profile_img || "",
+        imageFile: null,
         role: profile?.role || "SUPER_ADMIN",
       });
     } catch (error) {
@@ -35,13 +37,32 @@ export default function SuperAdminProfilePage() {
 
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
 
+  const onImageChange = (event) => {
+    const [file] = event.target.files || [];
+    if (!file) {
+      setForm((current) => ({ ...current, imageFile: null }));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setForm((current) => ({
+        ...current,
+        imageFile: file,
+        image: typeof reader.result === "string" ? reader.result : current.image,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const save = async () => {
     setSaving(true);
     try {
       await updateMyProfile({
         full_name: form.fullName,
         email: form.email,
-        profile_img: form.image,
+        profile_img: form.imageFile ? undefined : form.image,
+        imageFile: form.imageFile,
       });
       window.alert("Profile updated successfully.");
       await loadProfile();
@@ -68,7 +89,16 @@ export default function SuperAdminProfilePage() {
       <div className="grid gap-4 md:grid-cols-2">
         <FormInput label="Name" value={form.fullName} onChange={update("fullName")} />
         <FormInput label="Email" value={form.email} onChange={update("email")} />
-        <FormInput label="Profile Image" value={form.image} onChange={update("image")} />
+        <label className="block">
+          <span className="font-abel mb-2 block text-sm font-medium text-ink/80">Add Image</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={onImageChange}
+            className="font-abel w-full rounded-[24px] border border-black/10 bg-sand px-4 py-3 text-base text-ink outline-none transition file:mr-3 file:rounded-full file:border-0 file:bg-moss/15 file:px-3 file:py-1 file:text-sm file:font-semibold file:text-moss"
+          />
+        </label>
+        <FormInput label="Profile Image URL" value={form.image} onChange={update("image")} />
         <FormInput label="Role" value={form.role} readOnly />
       </div>
       <div className="mt-6 flex justify-end">

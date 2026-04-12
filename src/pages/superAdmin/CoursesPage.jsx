@@ -2,8 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import DataTable from "../../components/DataTable";
 import Modal from "../../components/Modal";
 import TableActions from "../../components/TableActions";
-import { deleteCourse, getCourses, updateCourse, updateCourseStatus } from "../../api/courseAPI";
+import { createCourse, deleteCourse, getCourses, updateCourse, updateCourseStatus } from "../../api/courseAPI";
 import { getCourseAdmins } from "../../api/superAdminAPI";
+
+const emptyCourseForm = {
+  name: "",
+  location: "",
+  courseRating: "",
+  slopeRating: "",
+  teeTimePrice: "",
+  status: "PENDING",
+  createdBy: "",
+  image: "",
+  imageFile: null,
+};
 
 export default function SuperAdminCoursesPage() {
   const [query, setQuery] = useState("");
@@ -13,7 +25,9 @@ export default function SuperAdminCoursesPage() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [openViewer, setOpenViewer] = useState(false);
   const [openAssignModal, setOpenAssignModal] = useState(false);
+  const [openCreateModal, setOpenCreateModal] = useState(false);
   const [assignAdminId, setAssignAdminId] = useState("");
+  const [courseForm, setCourseForm] = useState(emptyCourseForm);
 
   const loadCourses = async () => {
     setLoading(true);
@@ -46,6 +60,50 @@ export default function SuperAdminCoursesPage() {
     setSelectedCourse(course);
     setAssignAdminId(course?.createdById || "");
     setOpenAssignModal(true);
+  };
+
+  const openCreateCourseModal = () => {
+    setCourseForm(emptyCourseForm);
+    setOpenCreateModal(true);
+  };
+
+  const onImageChange = (event) => {
+    const [file] = event.target.files || [];
+    if (!file) {
+      setCourseForm((current) => ({ ...current, imageFile: null }));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCourseForm((current) => ({
+        ...current,
+        imageFile: file,
+        image: typeof reader.result === "string" ? reader.result : current.image,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const saveCourse = async () => {
+    try {
+      await createCourse({
+        name: courseForm.name,
+        location: courseForm.location,
+        courseRating: Number(courseForm.courseRating || 0),
+        slopeRating: Number(courseForm.slopeRating || 0),
+        teeTimePrice: Number(courseForm.teeTimePrice || 0),
+        status: courseForm.status || "PENDING",
+        createdBy: courseForm.createdBy || null,
+        image: courseForm.imageFile ? undefined : courseForm.image,
+        imageFile: courseForm.imageFile,
+      });
+
+      setOpenCreateModal(false);
+      await loadCourses();
+    } catch (error) {
+      window.alert(error?.response?.data?.msg || error?.response?.data?.error || "Failed to create course");
+    }
   };
 
   const assignAdmin = async () => {
@@ -138,7 +196,16 @@ export default function SuperAdminCoursesPage() {
           <h2 className="text-[40px] leading-none text-ink">Courses</h2>
           <p className="font-abel text-base text-ink/65">Oversee every golf course connected to the platform.</p>
         </div>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search courses" className="font-abel rounded-[24px] border-b border-ink/40 bg-transparent px-4 py-3 text-base outline-none" />
+        <div className="flex gap-3">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search courses" className="font-abel rounded-[24px] border-b border-ink/40 bg-transparent px-4 py-3 text-base outline-none" />
+          <button
+            type="button"
+            onClick={openCreateCourseModal}
+            className="font-bebas rounded-[24px] bg-[#C7A94A] px-5 py-3 text-xl text-[#192016]"
+          >
+            Add Course
+          </button>
+        </div>
       </div>
       <DataTable columns={columns} data={loading ? [] : filtered} />
 
@@ -205,6 +272,118 @@ export default function SuperAdminCoursesPage() {
               Save Assignment
             </button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal open={openCreateModal} title="Add Course" onClose={() => setOpenCreateModal(false)}>
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="block">
+            <span className="font-abel mb-2 block text-sm font-medium text-ink/80">Course Name</span>
+            <input
+              value={courseForm.name}
+              onChange={(event) => setCourseForm((current) => ({ ...current, name: event.target.value }))}
+              className="font-abel w-full rounded-[24px] border border-black/10 bg-sand px-4 py-3 text-base text-ink outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/15"
+            />
+          </label>
+
+          <label className="block">
+            <span className="font-abel mb-2 block text-sm font-medium text-ink/80">Location</span>
+            <input
+              value={courseForm.location}
+              onChange={(event) => setCourseForm((current) => ({ ...current, location: event.target.value }))}
+              className="font-abel w-full rounded-[24px] border border-black/10 bg-sand px-4 py-3 text-base text-ink outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/15"
+            />
+          </label>
+
+          <label className="block">
+            <span className="font-abel mb-2 block text-sm font-medium text-ink/80">Course Rating</span>
+            <input
+              type="number"
+              step="0.1"
+              value={courseForm.courseRating}
+              onChange={(event) => setCourseForm((current) => ({ ...current, courseRating: event.target.value }))}
+              className="font-abel w-full rounded-[24px] border border-black/10 bg-sand px-4 py-3 text-base text-ink outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/15"
+            />
+          </label>
+
+          <label className="block">
+            <span className="font-abel mb-2 block text-sm font-medium text-ink/80">Slope Rating</span>
+            <input
+              type="number"
+              value={courseForm.slopeRating}
+              onChange={(event) => setCourseForm((current) => ({ ...current, slopeRating: event.target.value }))}
+              className="font-abel w-full rounded-[24px] border border-black/10 bg-sand px-4 py-3 text-base text-ink outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/15"
+            />
+          </label>
+
+          <label className="block">
+            <span className="font-abel mb-2 block text-sm font-medium text-ink/80">Tee Time Price</span>
+            <input
+              type="number"
+              min="0"
+              value={courseForm.teeTimePrice}
+              onChange={(event) => setCourseForm((current) => ({ ...current, teeTimePrice: event.target.value }))}
+              className="font-abel w-full rounded-[24px] border border-black/10 bg-sand px-4 py-3 text-base text-ink outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/15"
+            />
+          </label>
+
+          <label className="block">
+            <span className="font-abel mb-2 block text-sm font-medium text-ink/80">Status</span>
+            <select
+              value={courseForm.status}
+              onChange={(event) => setCourseForm((current) => ({ ...current, status: event.target.value }))}
+              className="font-abel w-full rounded-[24px] border border-black/10 bg-sand px-4 py-3 text-base text-ink outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/15"
+            >
+              <option value="PENDING">PENDING</option>
+              <option value="APPROVED">APPROVED</option>
+              <option value="REJECTED">REJECTED</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="font-abel mb-2 block text-sm font-medium text-ink/80">Assign Course Admin (optional)</span>
+            <select
+              value={courseForm.createdBy}
+              onChange={(event) => setCourseForm((current) => ({ ...current, createdBy: event.target.value }))}
+              className="font-abel w-full rounded-[24px] border border-black/10 bg-sand px-4 py-3 text-base text-ink outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/15"
+            >
+              <option value="">Unassigned</option>
+              {courseAdmins.map((admin) => (
+                <option key={admin.id} value={admin.id}>
+                  {admin.fullName} ({admin.email})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block md:col-span-2">
+            <span className="font-abel mb-2 block text-sm font-medium text-ink/80">Add Image</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={onImageChange}
+              className="font-abel w-full rounded-[24px] border border-black/10 bg-sand px-4 py-3 text-base text-ink outline-none transition file:mr-3 file:rounded-full file:border-0 file:bg-moss/15 file:px-3 file:py-1 file:text-sm file:font-semibold file:text-moss"
+            />
+          </label>
+
+          <div className="md:col-span-2 flex items-center gap-3">
+            <img
+              src={courseForm.image || "https://via.placeholder.com/96x96?text=Course"}
+              alt="Course preview"
+              className="h-16 w-16 rounded-2xl border border-black/10 object-cover"
+            />
+            <span className="font-abel text-sm text-ink/65">Image preview</span>
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={saveCourse}
+            className="font-bebas rounded-[24px] bg-[#C7A94A] px-5 py-3 text-xl text-[#192016]"
+          >
+            Save Course
+          </button>
         </div>
       </Modal>
     </div>
