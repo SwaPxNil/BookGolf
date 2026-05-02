@@ -40,7 +40,7 @@ const resolveImageSource = (imageUrl, type) => {
   return cardFallbacks[type] || cardFallbacks.course;
 };
 
-const ShortcutRow = ({ title, actionLabel, onActionPress, items, renderCard, theme }) => (
+const ShortcutRow = ({ title, actionLabel, onActionPress, items, renderCard, theme, scrollStyle }) => (
   <View style={styles.quickSectionBlock}>
     <View style={styles.quickSectionHeader}>
       <Text style={[styles.quickSectionTitle, { color: theme.textPrimary }]}>{title}</Text>
@@ -52,6 +52,7 @@ const ShortcutRow = ({ title, actionLabel, onActionPress, items, renderCard, the
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={scrollStyle}
       contentContainerStyle={styles.quickHorizontalList}
     >
       {items.map(renderCard)}
@@ -64,6 +65,8 @@ export default function HomeScreen() {
   const { theme, mode } = useTheme();
   const { width, height } = useWindowDimensions();
   const iconTop = height * 0.055;
+  const topHeaderHeight = iconTop + 56;
+  const horizontalGutter = width * 0.06;
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [currentTab, setCurrentTab] = useState("home");
@@ -245,6 +248,19 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.container, { paddingHorizontal: width * 0.06, backgroundColor: theme.bg }]}>
       <StatusBar style={mode === "dark" ? "light" : "dark"} />
 
+      <View
+        pointerEvents="none"
+        style={[
+          styles.topHeaderContainer,
+          {
+            left: -(width * 0.06),
+            right: -(width * 0.06),
+            height: topHeaderHeight,
+            backgroundColor: theme.bg,
+          },
+        ]}
+      />
+
       <TouchableOpacity
         style={[
           styles.profileContainer,
@@ -254,7 +270,8 @@ export default function HomeScreen() {
       >
         <Image
           source={avatarSource}
-          style={styles.profileImage}
+          style={[styles.profileImage, profile?.profile_img ? styles.profileImageZoom : null]}
+          resizeMode="cover"
         />
       </TouchableOpacity>
 
@@ -276,7 +293,7 @@ export default function HomeScreen() {
           ]}
           onPress={() => navigation.navigate("MyBookings")}
         >
-          <Ionicons name="bookmarks" size={22} color={theme.icon} />
+          <Ionicons name="calendar-outline" size={22} color={theme.icon} />
         </TouchableOpacity>
       ) : null}
 
@@ -311,7 +328,16 @@ export default function HomeScreen() {
               <Text style={[styles.sectionTitle, { fontSize: width * 0.06, marginTop: 14, color: theme.textPrimary }]}> 
                 RECENT BOOKINGS
               </Text>
-            <View style={[styles.lessonCard, { borderRadius: width * 0.07 }]}>
+            <View
+              style={[
+                styles.lessonCard,
+                {
+                  borderRadius: width * 0.07,
+                  backgroundColor: mode === "dark" ? theme.card : "#575757",
+                  borderColor: mode === "dark" ? theme.line : "transparent",
+                },
+              ]}
+            >
               {recentBookings.map((booking, index) => {
                 const subjectName =
                   booking?.booking_type === "TEE_TIME"
@@ -323,21 +349,21 @@ export default function HomeScreen() {
                 return (
                   <View key={`${booking?._id ?? index}`} style={styles.lessonRow}>
                     <View style={styles.lessonTextBlock}>
-                      <Text style={styles.lessonText}>
+                      <Text style={[styles.lessonText, { color: mode === "dark" ? theme.textPrimary : "#fff" }]}> 
                         {booking?.user_id?.full_name || "User"} - {subjectName}
                       </Text>
-                      <Text style={styles.lessonMeta}>
+                      <Text style={[styles.lessonMeta, { color: mode === "dark" ? theme.textSecondary : "#d7d7d7" }]}>
                         {(booking?.booking_type || "").replace("_", " ")} - {booking?.status || "CONFIRMED"}
                       </Text>
                     </View>
-                    <Text style={styles.lessonScore}>
+                    <Text style={[styles.lessonScore, { color: theme.accent }]}>
                       {booking?.slot ? new Date(booking.slot).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "-"}
                     </Text>
                   </View>
                 );
               })}
               {recentBookings.length === 0 ? (
-                <Text style={styles.lessonEmpty}>No recent bookings found.</Text>
+                <Text style={[styles.lessonEmpty, { color: theme.textSecondary }]}>No recent bookings found.</Text>
               ) : null}
             </View>
             </>
@@ -353,12 +379,21 @@ export default function HomeScreen() {
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
+                style={{ marginRight: -horizontalGutter }}
                 contentContainerStyle={styles.quickHorizontalList}
               >
                 {recentBookingCards.map((bookingCard, index) => (
                   <TouchableOpacity
                     key={bookingCard.id}
-                    style={[styles.personCard, index > 0 && styles.personCardSpacing]}
+                    style={[
+                      styles.personCard,
+                      mode === "dark" ? styles.personCardDark : null,
+                      {
+                        borderColor: mode === "dark" ? theme.line : "rgba(46, 74, 55, 0.12)",
+                        backgroundColor: mode === "dark" ? theme.card : "#FFF8E7",
+                      },
+                      index > 0 && styles.personCardSpacing,
+                    ]}
                     onPress={() =>
                       navigation.navigate("BookingDetails", {
                         bookingId: bookingCard.raw?._id,
@@ -377,19 +412,25 @@ export default function HomeScreen() {
                           : "course"
                       )}
                       style={styles.personImage}
+                      resizeMode="cover"
                     />
-                    <View style={styles.personInfo}>
-                      <Text style={styles.personName} numberOfLines={1}>
+                    <View
+                      style={[
+                        styles.personInfo,
+                        mode === "dark" ? { backgroundColor: theme.card } : { backgroundColor: "#FFF8E7" },
+                      ]}
+                    >
+                      <Text style={[styles.personName, { color: mode === "dark" ? theme.textPrimary : "#1E211C" }]} numberOfLines={1}>
                         {bookingCard.title}
                       </Text>
-                      <Text style={styles.personMeta}>{bookingCard.type}</Text>
-                      <Text style={styles.personMeta}>{bookingCard.status}</Text>
-                      <Text style={styles.bookingCardDateInline}>{bookingCard.dateLabel}</Text>
+                      <Text style={[styles.personMeta, { color: mode === "dark" ? theme.textSecondary : "#50544C" }]}>{bookingCard.type}</Text>
+                      <Text style={[styles.personMeta, { color: mode === "dark" ? theme.textSecondary : "#50544C" }]}>{bookingCard.status}</Text>
+                      <Text style={[styles.bookingCardDateInline, { color: theme.accent }]}>{bookingCard.dateLabel}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
                 {recentBookingCards.length === 0 ? (
-                  <Text style={styles.lessonEmpty}>No recent bookings found.</Text>
+                  <Text style={[styles.lessonEmpty, { color: theme.textSecondary }]}>No recent bookings found.</Text>
                 ) : null}
               </ScrollView>
             </View>
@@ -424,6 +465,7 @@ export default function HomeScreen() {
               onActionPress={() => navigation.navigate("CourseScreen")}
               items={featuredCourses}
               theme={theme}
+              scrollStyle={{ marginRight: -horizontalGutter }}
               renderCard={(course, index) => (
                 <TouchableOpacity
                   key={course.id || `course-${index}`}
@@ -454,10 +496,19 @@ export default function HomeScreen() {
               onActionPress={() => navigation.navigate("coach")}
               items={topCoaches}
               theme={theme}
+              scrollStyle={{ marginRight: -horizontalGutter }}
               renderCard={(coach, index) => (
                 <TouchableOpacity
                   key={coach.id || `coach-${index}`}
-                  style={[styles.personCard, index > 0 && styles.personCardSpacing]}
+                  style={[
+                    styles.personCard,
+                    mode === "dark" ? styles.personCardDark : null,
+                    {
+                      borderColor: mode === "dark" ? theme.line : "rgba(46, 74, 55, 0.12)",
+                      backgroundColor: mode === "dark" ? theme.card : "#FFF8E7",
+                    },
+                    index > 0 && styles.personCardSpacing,
+                  ]}
                   onPress={() =>
                     navigation.navigate("CoachDetails", {
                       coachId: coach?.id,
@@ -466,15 +517,20 @@ export default function HomeScreen() {
                   }
                   activeOpacity={0.9}
                 >
-                  <Image source={resolveImageSource(coach.imageUrl, "coach")} style={styles.personImage} />
-                  <View style={styles.personInfo}>
-                    <Text style={styles.personName} numberOfLines={1}>
+                  <Image source={resolveImageSource(coach.imageUrl, "coach")} style={styles.personImage} resizeMode="cover" />
+                  <View
+                    style={[
+                      styles.personInfo,
+                      mode === "dark" ? { backgroundColor: theme.card } : { backgroundColor: "#FFF8E7" },
+                    ]}
+                  >
+                    <Text style={[styles.personName, { color: mode === "dark" ? theme.textPrimary : "#1E211C" }]} numberOfLines={1}>
                       {coach.name}
                     </Text>
-                    <Text style={styles.personMeta}>{coach.secondaryText}</Text>
+                    <Text style={[styles.personMeta, { color: mode === "dark" ? theme.textSecondary : "#50544C" }]}>{coach.secondaryText}</Text>
                     <View style={styles.ratingRow}>
                       <Ionicons name="star" size={12} color="#E4C95B" />
-                      <Text style={styles.ratingText}>{coach.rating}</Text>
+                      <Text style={[styles.ratingText, { color: mode === "dark" ? theme.textPrimary : "#2E4A37" }]}>{coach.rating}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -487,10 +543,19 @@ export default function HomeScreen() {
               onActionPress={() => navigation.navigate("caddie")}
               items={topCaddies}
               theme={theme}
+              scrollStyle={{ marginRight: -horizontalGutter }}
               renderCard={(caddie, index) => (
                 <TouchableOpacity
                   key={caddie.id || `caddie-${index}`}
-                  style={[styles.personCard, index > 0 && styles.personCardSpacing]}
+                  style={[
+                    styles.personCard,
+                    mode === "dark" ? styles.personCardDark : null,
+                    {
+                      borderColor: mode === "dark" ? theme.line : "rgba(46, 74, 55, 0.12)",
+                      backgroundColor: mode === "dark" ? theme.card : "#FFF8E7",
+                    },
+                    index > 0 && styles.personCardSpacing,
+                  ]}
                   onPress={() =>
                     navigation.navigate("CaddieBooking", {
                       caddieId: caddie?.id,
@@ -499,15 +564,20 @@ export default function HomeScreen() {
                   }
                   activeOpacity={0.9}
                 >
-                  <Image source={resolveImageSource(caddie.imageUrl, "caddie")} style={styles.personImage} />
-                  <View style={styles.personInfo}>
-                    <Text style={styles.personName} numberOfLines={1}>
+                  <Image source={resolveImageSource(caddie.imageUrl, "caddie")} style={styles.personImage} resizeMode="cover" />
+                  <View
+                    style={[
+                      styles.personInfo,
+                      mode === "dark" ? { backgroundColor: theme.card } : { backgroundColor: "#FFF8E7" },
+                    ]}
+                  >
+                    <Text style={[styles.personName, { color: mode === "dark" ? theme.textPrimary : "#1E211C" }]} numberOfLines={1}>
                       {caddie.name}
                     </Text>
-                    <Text style={styles.personMeta}>{caddie.secondaryText}</Text>
+                    <Text style={[styles.personMeta, { color: mode === "dark" ? theme.textSecondary : "#50544C" }]}>{caddie.secondaryText}</Text>
                     <View style={styles.ratingRow}>
                       <Ionicons name="star" size={12} color="#E4C95B" />
-                      <Text style={styles.ratingText}>{caddie.rating}</Text>
+                      <Text style={[styles.ratingText, { color: mode === "dark" ? theme.textPrimary : "#2E4A37" }]}>{caddie.rating}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -532,10 +602,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#E7E2D3",
   },
 
+  topHeaderContainer: {
+    position: "absolute",
+    top: 0,
+    zIndex: 6,
+  },
+
   profileContainer: {
     position: "absolute",
-    width: 45,
-    height: 45,
+    width: 52,
+    height: 52,
     borderRadius: 30,
     overflow: "hidden",
     backgroundColor: "#ccc",
@@ -565,6 +641,9 @@ const styles = StyleSheet.create({
   profileImage: {
     width: "100%",
     height: "100%",
+  },
+  profileImageZoom: {
+    transform: [{ scale: 1.16 }],
   },
 
   brandWordmark: {
@@ -722,7 +801,7 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   quickHorizontalList: {
-    paddingRight: 4,
+    paddingRight: 0,
   },
   featureCard: {
     width: 220,
@@ -767,6 +846,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF8E7",
     borderWidth: 1,
     borderColor: "rgba(46, 74, 55, 0.12)",
+  },
+  personCardDark: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 4,
   },
   personCardSpacing: {
     marginLeft: 12,

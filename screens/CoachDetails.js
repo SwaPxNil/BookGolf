@@ -15,6 +15,7 @@ import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "@react-navigation/native";
 import LessonCard from "../components/LessonCard";
 import { useCoach, useCoachLessons } from "../hooks/useCoach";
+import { useCourses } from "../hooks/useCourse";
 import Navbar from "../components/Navbar";
 import { useTheme } from "../theme/ThemeContext";
 const { width, height } = Dimensions.get("window");
@@ -27,18 +28,57 @@ export default function CoachDetailsScreen({ route }) {
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
   const { theme, mode } = useTheme();
-    const [currentTab, setCurrentTab] = useState("coach");
+  const [currentTab, setCurrentTab] = useState("coach");
+  const [expandedSections, setExpandedSections] = useState({
+    topRated: false,
+    available: false,
+    improveDrive: false,
+  });
   
   const coachId = route?.params?.coachId || route?.params?.coach?.id || route?.params?.coach?._id;
   const { data: coachResponse } = useCoach(coachId, { retry: false });
   const { data: lessonsResponse } = useCoachLessons(coachId, { retry: false });
+  const { data: coursesResponse } = useCourses({ retry: false });
 
   const coachData = coachResponse?.data?.data || {};
   const lessonsData = Array.isArray(lessonsResponse?.data?.data) ? lessonsResponse.data.data : [];
+  const courses = Array.isArray(coursesResponse?.data?.data) ? coursesResponse.data.data : [];
+  const courseNameById = courses.reduce((acc, course) => {
+    const key = String(course?._id || "");
+    if (key) {
+      acc[key] = course?.name || course?.course_name || "";
+    }
+    return acc;
+  }, {});
+  const courseNameByCreatorId = courses.reduce((acc, course) => {
+    const creatorKey = String(course?.created_by?._id || course?.created_by || "");
+    if (creatorKey && !acc[creatorKey]) {
+      acc[creatorKey] = course?.name || course?.course_name || "";
+    }
+    return acc;
+  }, {});
+
+  const resolvedCourseId =
+    coachData?.course_id?._id ||
+    coachData?.course_id ||
+    route?.params?.coach?.course_id ||
+    route?.params?.coach?.courseId;
+  const resolvedCreatorId =
+    coachData?.created_by?._id ||
+    coachData?.created_by ||
+    route?.params?.coach?.created_by;
 
   const coach = {
     id: coachData?._id || coachId || "",
     name: coachData?.full_name || route?.params?.coach?.name || "Coach",
+    courseName:
+      coachData?.course_id?.name ||
+      coachData?.course?.name ||
+      coachData?.course_name ||
+      route?.params?.coach?.courseName ||
+      (resolvedCourseId ? courseNameById[String(resolvedCourseId)] : "") ||
+      (resolvedCreatorId ? courseNameByCreatorId[String(resolvedCreatorId)] : "") ||
+      "Unknown course",
     rating: Number(coachData?.rating ?? route?.params?.coach?.rating ?? 0).toFixed(1),
     imageUrl: coachData?.profile_img || coachData?.image_url || null,
     description:
@@ -66,6 +106,12 @@ export default function CoachDetailsScreen({ route }) {
     navigation.navigate("LessonBooking", { coach, lesson });
   };
   const handleTabPress = (tab) => navigation.navigate(tab);
+  const toggleSection = (sectionKey) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey],
+    }));
+  };
 
 
   return (
@@ -96,18 +142,19 @@ export default function CoachDetailsScreen({ route }) {
             style={styles.profilePic}
           />
           <View style={styles.profileTextContainer}>
-            <Text style={styles.coachName}>{coach.name}</Text>
+            <Text style={[styles.coachName, { color: theme.textPrimary }]}>{coach.name}</Text>
+            <Text style={[styles.courseName, { color: theme.accent }]}>{coach.courseName}</Text>
             <View style={styles.ratingRow}>
               <View style={styles.ratingBadge}>
                 <Ionicons name="star" size={14} color="#FFD700" />
                 <Text style={styles.ratingText}>{coach.rating}</Text>
               </View>
-              <Text style={styles.reviewsText}>{coach.reviewsCount} reviews</Text>
+              <Text style={[styles.reviewsText, { color: theme.textSecondary }]}>{coach.reviewsCount} reviews</Text>
             </View>
           </View>
         </View>
 
-        <Text style={styles.descriptionText}>
+        <Text style={[styles.descriptionText, { color: theme.textSecondary }]}>
           {coach.description}
         </Text>
 
@@ -120,7 +167,8 @@ export default function CoachDetailsScreen({ route }) {
         <StatCircle 
           number={String(coach.reviewsCount)} 
           text="reviews" 
-          size={CIRCLE_SIZE} 
+          size={CIRCLE_SIZE}
+          theme={theme}
         />
       </View>
 
@@ -128,7 +176,8 @@ export default function CoachDetailsScreen({ route }) {
         <StatCircle 
           number={String(coach.studentsTaught)} 
           text="students" 
-          size={CIRCLE_SIZE} 
+          size={CIRCLE_SIZE}
+          theme={theme}
         />
       </View>
 
@@ -136,7 +185,8 @@ export default function CoachDetailsScreen({ route }) {
         <StatCircle 
           number={String(coach.experienceYears)} 
           text="years" 
-          size={CIRCLE_SIZE} 
+          size={CIRCLE_SIZE}
+          theme={theme}
         />
       </View>
 
@@ -145,6 +195,7 @@ export default function CoachDetailsScreen({ route }) {
           number={`${Math.round(Number(coach.recommendationValue || 0))}%`}
           text="suggested"
           size={CIRCLE_SIZE}
+          theme={theme}
         />
       </View>
     </View>
@@ -152,24 +203,33 @@ export default function CoachDetailsScreen({ route }) {
         {/* LESSON LISTS */}
         <LessonSection 
           title="TOP RATED" 
-          lessons={lessonList} 
+          lessons={expandedSections.topRated ? lessonList : lessonList.slice(0, 4)}
           width={width} 
           cardColor="#0A2024" 
           onLessonPress={handleLessonPress}
+          theme={theme}
+          onViewAll={() => toggleSection("topRated")}
+          viewAllLabel={expandedSections.topRated ? "show less" : "view all"}
         />
         <LessonSection 
           title="AVAILABLE NOW" 
-          lessons={lessonList} 
+          lessons={expandedSections.available ? lessonList : lessonList.slice(0, 4)}
           width={width} 
           cardColor="#27352A" 
           onLessonPress={handleLessonPress}
+          theme={theme}
+          onViewAll={() => toggleSection("available")}
+          viewAllLabel={expandedSections.available ? "show less" : "view all"}
         />
         <LessonSection 
           title="IMPROVE YOUR DRIVE" 
-          lessons={lessonList} 
+          lessons={expandedSections.improveDrive ? lessonList : lessonList.slice(0, 4)}
           width={width} 
           cardColor="#28343A" 
           onLessonPress={handleLessonPress}
+          theme={theme}
+          onViewAll={() => toggleSection("improveDrive")}
+          viewAllLabel={expandedSections.improveDrive ? "show less" : "view all"}
         />
         
         <View style={{ height: 40 }} /> 
@@ -183,18 +243,20 @@ export default function CoachDetailsScreen({ route }) {
   );
 }
 
-const StatCircle = ({ number, text }) => (
-  <View style={styles.circle}>
-    <Text style={styles.circleNumber}>{number}</Text>
-    <Text style={styles.circleText}>{text}</Text>
+const StatCircle = ({ number, text, theme }) => (
+  <View style={[styles.circle, { borderColor: theme.line }]}>
+    <Text style={[styles.circleNumber, { color: theme.textPrimary }]}>{number}</Text>
+    <Text style={[styles.circleText, { color: theme.textSecondary }]}>{text}</Text>
   </View>
 );
 
-const LessonSection = ({ title, lessons, width, cardColor, onLessonPress }) => (
+const LessonSection = ({ title, lessons, width, cardColor, onLessonPress, theme, onViewAll, viewAllLabel }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.viewAll}>view all</Text>
+      <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>{title}</Text>
+      <TouchableOpacity onPress={onViewAll} activeOpacity={0.8}>
+        <Text style={[styles.viewAll, { color: theme.accent }]}>{viewAllLabel}</Text>
+      </TouchableOpacity>
     </View>
 
     <ScrollView
@@ -268,6 +330,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontFamily: "Bebas",
     color: "#222",
+  },
+
+  courseName: {
+    fontSize: 15,
+    fontFamily: "Abel",
+    marginTop: 2,
   },
 
   ratingRow: {

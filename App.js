@@ -5,7 +5,9 @@ import { StyleSheet } from 'react-native';
 import MatchHistoryScreen from './screens/MatchHistoryScreen';
 import ReservationScreen from './screens/Reservation';
 import CoachesScreen from './screens/CoachesScreen';
+import CoachesListScreen from './screens/CoachesListScreen';
 import CaddieScreen from './screens/CaddieScreen';
+import CaddiesListScreen from './screens/CaddiesListScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import HomeScreen from './screens/HomeScreen';
 import SearchScreen from './screens/SearchScreen';
@@ -122,8 +124,10 @@ export default function App() {
               <Stack.Screen name="MatchHistory" component={MatchHistoryScreen} />
               <Stack.Screen name="ReservationScreen" component={ReservationScreen} />
               <Stack.Screen name="coach" component={CoachesScreen} />
+              <Stack.Screen name="CoachesList" component={CoachesListScreen} />
               <Stack.Screen name="match" component={MatchHistoryScreen} />
               <Stack.Screen name="caddie" component={CaddieScreen} />
+              <Stack.Screen name="CaddiesList" component={CaddiesListScreen} />
               <Stack.Screen name="profile" component={ProfileScreen} />
               <Stack.Screen name="EditProfile" component={EditProfileScreen} />
               <Stack.Screen name="SearchScreen" component={SearchScreen} />

@@ -6,6 +6,8 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
+  Image,
+  ImageBackground,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -26,10 +28,34 @@ export default function SearchScreen({ navigation }) {
     ? data.data
     : [];
 
-  const filteredCourses = courses.filter((course) => {
-    const courseName = `${course?.name ?? course?.course_name ?? ""}`;
+  const normalizedCourses = courses.map((course, index) => ({
+    id: String(course?._id ?? course?.id ?? `course-${index}`),
+    name: course?.name ?? course?.course_name ?? "Unnamed course",
+    location: course?.location || "Location unavailable",
+    rating: Number(course?.course_rating ?? 0),
+    imageUrl: course?.image_url || null,
+    raw: course,
+  }));
+
+  const filteredCourses = normalizedCourses.filter((course) => {
+    const courseName = `${course?.name ?? ""}`;
     return courseName.toLowerCase().includes(query.toLowerCase());
   });
+
+  const handleCoursePress = (course) => {
+    navigation.navigate("ReservationScreen", {
+      course: {
+        ...(course.raw || {}),
+        id: course.id,
+        _id: course.id,
+        name: course.name,
+        location: course.location,
+        course_rating: course.rating,
+        image_url: course.imageUrl,
+      },
+      courseId: course.id,
+    });
+  };
 
   return (
     <SafeAreaView style={[styles.container, { paddingHorizontal: width * 0.06, backgroundColor: theme.bg }]}>
@@ -37,8 +63,11 @@ export default function SearchScreen({ navigation }) {
 
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={26} color={theme.icon} />
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.8}>
+          <Image
+            source={require("../assets/icons/Back.png")}
+            style={[styles.backIcon, { tintColor: theme.icon }]}
+          />
         </TouchableOpacity>
 
         <Text style={[styles.headerTitle, { fontSize: width * 0.08, color: theme.textPrimary }]}>
@@ -71,16 +100,41 @@ export default function SearchScreen({ navigation }) {
         }
         contentContainerStyle={{ marginTop: 20 }}
         renderItem={({ item }) => (
-          <View
+          <TouchableOpacity
+            activeOpacity={0.88}
+            onPress={() => handleCoursePress(item)}
             style={[
               styles.courseCard,
-              { borderRadius: width * 0.05, backgroundColor: theme.card },
+              { borderRadius: width * 0.05 },
             ]}
           >
-            <Text style={[styles.courseText, { fontSize: width * 0.045, color: "#fff" }]}>
-              {item?.name ?? item?.course_name ?? "Unnamed course"}
-            </Text>
-          </View>
+            <ImageBackground
+              source={
+                item.imageUrl
+                  ? { uri: item.imageUrl }
+                  : require("../assets/images/course1.png")
+              }
+              style={styles.courseImageBg}
+              imageStyle={styles.courseImage}
+            >
+              <View style={styles.courseOverlay} />
+
+              <View style={styles.ratingChip}>
+                <Ionicons name="star" size={15} color="#FFD700" />
+                <Text style={styles.ratingChipText}>{Number(item.rating || 0).toFixed(1)}</Text>
+              </View>
+
+              <View style={styles.courseContent}>
+                <Text style={[styles.courseText, { fontSize: width * 0.053, color: "#fff" }]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={styles.courseMeta} numberOfLines={1}>
+                  {item.location}
+                </Text>
+              </View>
+
+            </ImageBackground>
+          </TouchableOpacity>
         )}
       />
     </SafeAreaView>
@@ -97,6 +151,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 10,
+  },
+  backIcon: {
+    width: 32,
+    height: 32,
   },
 
   headerTitle: {
@@ -122,12 +180,59 @@ const styles = StyleSheet.create({
 
   courseCard: {
     backgroundColor: "#575757",
-    padding: 20,
+    overflow: "hidden",
     marginBottom: 12,
+    height: 165,
+  },
+
+  courseImageBg: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "space-between",
+  },
+
+  courseImage: {
+    borderRadius: 20,
+  },
+
+  courseOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.38)",
+  },
+
+  ratingChip: {
+    alignSelf: "flex-end",
+    marginTop: 12,
+    marginRight: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(10, 12, 11, 0.72)",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  ratingChipText: {
+    marginLeft: 5,
+    fontFamily: "Abel",
+    color: "#F7F9F4",
+    fontSize: 15,
+  },
+
+  courseContent: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
   },
 
   courseText: {
-    fontFamily: "Abel",
+    fontFamily: "Bebas",
     color: "#fff",
+  },
+
+  courseMeta: {
+    fontFamily: "Abel",
+    fontSize: 18,
+    marginTop: 2,
+    color: "#E9EEE5",
   },
 });

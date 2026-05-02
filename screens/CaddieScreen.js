@@ -17,6 +17,7 @@ import { StatusBar } from "expo-status-bar";
 import Header from "../components/Header";
 import Navbar from "../components/Navbar";
 import { useCaddies } from "../hooks/useCaddie";
+import { useCourses } from "../hooks/useCourse";
 import { useMyProfile } from "../hooks/useAuth";
 import { useTheme } from "../theme/ThemeContext";
 
@@ -27,6 +28,7 @@ export default function CaddieScreen({ navigation }) {
   // We grab both width and height here
   const { width, height } = useWindowDimensions();
   const { data: caddiesResponse, refetch: refetchCaddies } = useCaddies({ retry: false });
+  const { data: coursesResponse } = useCourses({ retry: false });
   const { data: profileData } = useMyProfile({ retry: false });
   const [refreshing, setRefreshing] = useState(false);
   const profile = profileData?.data?.data ?? profileData?.data ?? {};
@@ -34,12 +36,54 @@ export default function CaddieScreen({ navigation }) {
     ? { uri: profile.profile_img }
     : require("../assets/images/Avatar.png");
 
+  const courses = Array.isArray(coursesResponse?.data?.data) ? coursesResponse.data.data : [];
+  const courseNameById = courses.reduce((acc, course) => {
+    const key = String(course?._id || "");
+    if (key) {
+      acc[key] = course?.name || course?.course_name || "";
+    }
+    return acc;
+  }, {});
+
+  const courseNameByCreatorId = courses.reduce((acc, course) => {
+    const creatorKey = String(course?.created_by?._id || course?.created_by || "");
+    if (creatorKey && !acc[creatorKey]) {
+      acc[creatorKey] = course?.name || course?.course_name || "";
+    }
+    return acc;
+  }, {});
+
+  const resolveCourseName = (entity) => {
+    const courseId =
+      entity?.course_id?._id ||
+      entity?.course_id ||
+      entity?.course?.id ||
+      entity?.course?._id;
+    const creatorId = entity?.created_by?._id || entity?.created_by;
+
+    return (
+      entity?.course_id?.name ||
+      entity?.course?.name ||
+      entity?.course_name ||
+      entity?.courseName ||
+      (courseId ? courseNameById[String(courseId)] : "") ||
+      (creatorId ? courseNameByCreatorId[String(creatorId)] : "") ||
+      "Unknown course"
+    );
+  };
+
   const caddies = Array.isArray(caddiesResponse?.data?.data)
     ? caddiesResponse.data.data.map((caddie) => ({
         id: caddie?._id,
         name: caddie?.full_name || "Unnamed Caddie",
         matches: `${caddie?.matches_caddied ?? 0} matches`,
         rating: Number(caddie?.rating ?? 0).toFixed(1),
+        courseName: resolveCourseName(caddie),
+        description:
+          caddie?.description ||
+          caddie?.bio ||
+          caddie?.speciality ||
+          "Reliable support across the round with local course knowledge.",
         status:
           Array.isArray(caddie?.availability_slots) && caddie.availability_slots.length > 0
             ? "available"
@@ -54,13 +98,22 @@ export default function CaddieScreen({ navigation }) {
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const topRated = [...filtered].slice(0, 4);
+  const topRated = [...filtered].sort((a, b) => Number(b.rating) - Number(a.rating));
   const available = filtered.filter((c) => c.status === "available");
+  const displayedTopRated = topRated.slice(0, 4);
+  const displayedAvailable = available.slice(0, 4);
 
   const onTabPress = (tab) => navigation.navigate(tab);
 
   const handleCaddiePress = (caddie) => {
     navigation.navigate("CaddieBooking", { caddieId: caddie.id, caddie });
+  };
+
+  const handleViewAll = (title, list) => {
+    navigation.navigate("CaddiesList", {
+      title,
+      caddies: list,
+    });
   };
 
   const handleRefresh = async () => {
@@ -115,21 +168,23 @@ export default function CaddieScreen({ navigation }) {
         {/* Passing height down to the section */}
         <CaddieSection
           title="TOP RATED"
-          caddies={topRated}
+          caddies={displayedTopRated}
           width={width}
           height={height}
           theme={theme}
           onPress={handleCaddiePress}
+          onViewAll={() => handleViewAll("TOP RATED CADDIES", topRated)}
         />
 
         {/* Passing height down to the section */}
         <CaddieSection
           title="AVAILABLE NOW"
-          caddies={available}
+          caddies={displayedAvailable}
           width={width}
           height={height}
           theme={theme}
           onPress={handleCaddiePress}
+          onViewAll={() => handleViewAll("AVAILABLE CADDIES", available)}
         />
       </ScrollView>
 
@@ -143,11 +198,13 @@ export default function CaddieScreen({ navigation }) {
 }
 
 // Receive height in props here
-const CaddieSection = ({ title, caddies, width, height, onPress, theme }) => (
+const CaddieSection = ({ title, caddies, width, height, onPress, theme, onViewAll }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.sectionHeader}>
       <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>{title}</Text>
-      <Text style={[styles.viewAll, { color: theme.accent }]}>view all</Text>
+      <TouchableOpacity onPress={onViewAll} activeOpacity={0.8}>
+        <Text style={[styles.viewAll, { color: theme.accent }]}>view all</Text>
+      </TouchableOpacity>
     </View>
 
     <ScrollView
@@ -199,6 +256,7 @@ const CaddieCard = ({ caddie, width, height, isFirst, onPress }) => {
 
       <View style={styles.overlay}>
         <Text style={styles.name}>{caddie.name}</Text>
+        <Text style={styles.course}>{caddie.courseName}</Text>
         <Text style={styles.exp}>{caddie.matches}</Text>
       </View>
     </TouchableOpacity>
@@ -294,6 +352,11 @@ const styles = StyleSheet.create({
   exp: {
     color: "#fff",
     fontSize: 16,
+    fontFamily: "Abel",
+  },
+  course: {
+    color: "#FAFF5D",
+    fontSize: 13,
     fontFamily: "Abel",
   },
 });

@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useCaddie, useCaddieAvailability } from "../hooks/useCaddie";
+import { useCourses } from "../hooks/useCourse";
 import BookingPaymentModal from "../components/BookingPaymentModal";
 import {
   useInitiateAdvanceBookingPayment,
@@ -46,6 +47,7 @@ export default function CaddieBookingScreen() {
     isLoading: availabilityLoading,
     refetch: refetchAvailability,
   } = useCaddieAvailability(caddieId, { retry: false });
+  const { data: coursesResponse } = useCourses({ retry: false });
   const initiatePaymentMutation = useInitiateAdvanceBookingPayment({
     onError: (error) => {
       Alert.alert(
@@ -73,9 +75,42 @@ export default function CaddieBookingScreen() {
   });
 
   const caddieData = caddieResponse?.data?.data || {};
+  const courses = Array.isArray(coursesResponse?.data?.data) ? coursesResponse.data.data : [];
+  const courseNameById = courses.reduce((acc, course) => {
+    const key = String(course?._id || "");
+    if (key) {
+      acc[key] = course?.name || course?.course_name || "";
+    }
+    return acc;
+  }, {});
+  const courseNameByCreatorId = courses.reduce((acc, course) => {
+    const creatorKey = String(course?.created_by?._id || course?.created_by || "");
+    if (creatorKey && !acc[creatorKey]) {
+      acc[creatorKey] = course?.name || course?.course_name || "";
+    }
+    return acc;
+  }, {});
+  const resolvedCourseId =
+    caddieData?.course_id?._id ||
+    caddieData?.course_id ||
+    route?.params?.caddie?.course_id ||
+    route?.params?.caddie?.courseId;
+  const resolvedCreatorId =
+    caddieData?.created_by?._id ||
+    caddieData?.created_by ||
+    route?.params?.caddie?.created_by;
+
   const caddie = {
     id: caddieData?._id || caddieId || "",
     name: caddieData?.full_name || route?.params?.caddie?.name || "Caddie",
+    courseName:
+      caddieData?.course_id?.name ||
+      caddieData?.course?.name ||
+      caddieData?.course_name ||
+      route?.params?.caddie?.courseName ||
+      (resolvedCourseId ? courseNameById[String(resolvedCourseId)] : "") ||
+      (resolvedCreatorId ? courseNameByCreatorId[String(resolvedCreatorId)] : "") ||
+      "Unknown course",
     imageUrl: caddieData?.profile_img || caddieData?.image_url || route?.params?.caddie?.imageUrl || null,
     rating: String(Number(caddieData?.rating ?? route?.params?.caddie?.rating ?? 0).toFixed(1)),
     matches: `${caddieData?.matches_caddied ?? 0}+`,
@@ -343,12 +378,14 @@ export default function CaddieBookingScreen() {
       {/* HEADER CONTENT */}
       <Animated.View style={[styles.headerTextContainer, { transform: [{ translateY: headerTranslateY }] }]}>
         <Text style={styles.caddieName}>{caddie.name.toUpperCase()}</Text>
+        <Text style={styles.caddieCourse}>{caddie.courseName}</Text>
 
         {/* STEP 2: SMALL ANIMATED SUMMARY PILL */}
         <Animated.View style={[styles.summaryPill, { opacity: smallPillOpacity }]}>
           <Text style={styles.pillLabel}>CADDIE DETAILS</Text>
           <View style={styles.pillRow}>
             <Text style={styles.pillTitle}>{caddie.name}</Text>
+            <Text style={[styles.pillTitle, { color: "#FAFF5D" }]}>{caddie.courseName}</Text>
             
             <View style={styles.pillDetail}>
               <Ionicons name="star" size={14} color="#FFD700" />
@@ -377,6 +414,7 @@ export default function CaddieBookingScreen() {
             <View style={styles.step1Content}>
               <Text style={styles.sectionHeaderSmall}>CADDIE DETAILS</Text>
               <Text style={styles.bigCardTitle}>{caddie.name}</Text>
+              <Text style={styles.bigCardCourse}>{caddie.courseName}</Text>
               <Text style={styles.bigCardDesc}>{service.fullDescription}</Text>
               
               <View style={styles.infoTable}>
@@ -404,6 +442,12 @@ export default function CaddieBookingScreen() {
                   <Text style={styles.infoLabel}>SPECIALITY</Text>
                   <View style={styles.infoValueContainer}>
                     <Text style={[styles.infoValue, { color: "#fff" }]}>{caddie.speciality}</Text>
+                  </View>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>COURSE</Text>
+                  <View style={styles.infoValueContainer}>
+                    <Text style={[styles.infoValue, { color: "#FAFF5D" }]}>{caddie.courseName}</Text>
                   </View>
                 </View>
               </View>
@@ -568,6 +612,16 @@ const styles = StyleSheet.create({
     textShadowRadius: 5 
   },
 
+  caddieCourse: {
+    color: "#FAFF5D",
+    fontSize: 16,
+    fontFamily: "Abel",
+    marginBottom: 4,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 4,
+  },
+
   headerTextContainer: {
     position: "absolute",
     bottom: BOTTOM_SHEET_HEIGHT + 20, 
@@ -616,6 +670,13 @@ bigCardDesc: {
   fontFamily: "Abel",
   fontSize: 16,
   lineHeight: 24,
+},
+
+bigCardCourse: {
+  color: "#FAFF5D",
+  fontFamily: "Abel",
+  fontSize: 15,
+  marginBottom: 8,
 },
 
 infoTable: {

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,12 +19,15 @@ import { useCourses } from "../hooks/useCourse";
 import { useMyProfile } from "../hooks/useAuth";
 import { useTheme } from "../theme/ThemeContext";
 
-export default function CoursesScreen() {
+export default function CoursesScreen({ route }) {
   const navigation = useNavigation();
   const { theme, mode } = useTheme();
   const scrollX = useRef(new Animated.Value(0)).current;
+  const listRef = useRef(null);
+  const hasFocusedSelectionRef = useRef(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [currentTab, setCurrentTab] = useState("courses");
+  const selectedCourseId = route?.params?.selectedCourseId;
   
   // 1. Grab dimensions dynamically
   const { width, height } = useWindowDimensions();
@@ -69,6 +72,36 @@ export default function CoursesScreen() {
   ];
 
   const coursesToRender = uiCourses.length > 0 ? uiCourses : fallbackCourses;
+
+  useEffect(() => {
+    hasFocusedSelectionRef.current = false;
+  }, [selectedCourseId]);
+
+  useEffect(() => {
+    if (!selectedCourseId || coursesToRender.length === 0 || hasFocusedSelectionRef.current) {
+      return;
+    }
+
+    const targetIndex = coursesToRender.findIndex(
+      (course) => String(course?.id) === String(selectedCourseId)
+    );
+
+    if (targetIndex < 0) {
+      return;
+    }
+
+    hasFocusedSelectionRef.current = true;
+    setActiveIndex(targetIndex);
+
+    requestAnimationFrame(() => {
+      if (listRef.current) {
+        listRef.current.scrollToOffset({
+          offset: targetIndex * ITEM_WIDTH,
+          animated: true,
+        });
+      }
+    });
+  }, [selectedCourseId, coursesToRender, ITEM_WIDTH]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length > 0) {
@@ -166,6 +199,7 @@ export default function CoursesScreen() {
       <View style={styles.contentBody}>
         <View style={[styles.carouselContainer, { height: height * 0.45 }]}>
           <Animated.FlatList
+            ref={listRef}
             data={coursesToRender}
             keyExtractor={(item) => item.id}
             horizontal

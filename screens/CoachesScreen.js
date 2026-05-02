@@ -17,6 +17,7 @@ import { StatusBar } from "expo-status-bar";
 import Header from "../components/Header";
 import Navbar from "../components/Navbar";
 import { useCoaches } from "../hooks/useCoach";
+import { useCourses } from "../hooks/useCourse";
 import { useMyProfile } from "../hooks/useAuth";
 import { useTheme } from "../theme/ThemeContext";
 
@@ -27,12 +28,49 @@ export default function CoachesScreen({ navigation }) {
   // Destructure height here as well
   const { width, height } = useWindowDimensions();
   const { data: coachesResponse, refetch: refetchCoaches } = useCoaches({ retry: false });
+  const { data: coursesResponse } = useCourses({ retry: false });
   const { data: profileData } = useMyProfile({ retry: false });
   const [refreshing, setRefreshing] = useState(false);
   const profile = profileData?.data?.data ?? profileData?.data ?? {};
   const avatarSource = profile?.profile_img
     ? { uri: profile.profile_img }
     : require("../assets/images/Avatar.png");
+
+  const courses = Array.isArray(coursesResponse?.data?.data) ? coursesResponse.data.data : [];
+  const courseNameById = courses.reduce((acc, course) => {
+    const key = String(course?._id || "");
+    if (key) {
+      acc[key] = course?.name || course?.course_name || "";
+    }
+    return acc;
+  }, {});
+
+  const courseNameByCreatorId = courses.reduce((acc, course) => {
+    const creatorKey = String(course?.created_by?._id || course?.created_by || "");
+    if (creatorKey && !acc[creatorKey]) {
+      acc[creatorKey] = course?.name || course?.course_name || "";
+    }
+    return acc;
+  }, {});
+
+  const resolveCourseName = (entity) => {
+    const courseId =
+      entity?.course_id?._id ||
+      entity?.course_id ||
+      entity?.course?.id ||
+      entity?.course?._id;
+    const creatorId = entity?.created_by?._id || entity?.created_by;
+
+    return (
+      entity?.course_id?.name ||
+      entity?.course?.name ||
+      entity?.course_name ||
+      entity?.courseName ||
+      (courseId ? courseNameById[String(courseId)] : "") ||
+      (creatorId ? courseNameByCreatorId[String(creatorId)] : "") ||
+      "Unknown course"
+    );
+  };
 
   const coaches = Array.isArray(coachesResponse?.data?.data)
     ? coachesResponse.data.data.map((coach) => {
@@ -44,6 +82,12 @@ export default function CoachesScreen({ navigation }) {
         id: coach?._id,
         name: coach?.full_name || "Unnamed Coach",
         experience: `${coach?.experience_years ?? 0} years experience`,
+        courseName: resolveCourseName(coach),
+        description:
+          coach?.description ||
+          coach?.bio ||
+          coach?.speciality ||
+          "Tap to view this coach's full profile and lesson options.",
         rating: Number.isFinite(numericRating) ? numericRating : 0,
         status:
           Array.isArray(coach?.availability_slots) && coach.availability_slots.length > 0
@@ -58,15 +102,22 @@ export default function CoachesScreen({ navigation }) {
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const topRated = [...filtered]
-    .sort((a, b) => b.rating - a.rating)
-    .slice(0, 4);
+  const topRated = [...filtered].sort((a, b) => b.rating - a.rating);
   const available = filtered.filter((c) => c.status === "available");
+  const displayedTopRated = topRated.slice(0, 4);
+  const displayedAvailable = available.slice(0, 4);
 
   const onTabPress = (tab) => navigation.navigate(tab);
 
   const handleCoachPress = (coach) => {
     navigation.navigate("CoachDetails", { coachId: coach.id, coach });
+  };
+
+  const handleViewAll = (title, list) => {
+    navigation.navigate("CoachesList", {
+      title,
+      coaches: list,
+    });
   };
 
   const handleRefresh = async () => {
@@ -121,20 +172,22 @@ export default function CoachesScreen({ navigation }) {
         {/* Pass height down here */}
         <CoachSection
           title="TOP RATED"
-          coaches={topRated}
+          coaches={displayedTopRated}
           width={width}
           height={height}
           theme={theme}
           onPress={handleCoachPress}
+          onViewAll={() => handleViewAll("TOP RATED COACHES", topRated)}
         />
 
         <CoachSection
           title="AVAILABLE NOW"
-          coaches={available}
+          coaches={displayedAvailable}
           width={width}
           height={height}
           theme={theme}
           onPress={handleCoachPress}
+          onViewAll={() => handleViewAll("AVAILABLE COACHES", available)}
         />
       </ScrollView>
 
@@ -148,11 +201,13 @@ export default function CoachesScreen({ navigation }) {
 }
 
 // Receive height in props
-const CoachSection = ({ title, coaches, width, height, onPress, theme }) => (
+const CoachSection = ({ title, coaches, width, height, onPress, theme, onViewAll }) => (
   <View style={styles.sectionContainer}>
     <View style={styles.sectionHeader}>
       <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>{title}</Text>
-      <Text style={[styles.viewAll, { color: theme.accent }]}>view all</Text>
+      <TouchableOpacity onPress={onViewAll} activeOpacity={0.8}>
+        <Text style={[styles.viewAll, { color: theme.accent }]}>view all</Text>
+      </TouchableOpacity>
     </View>
 
     <ScrollView
@@ -205,6 +260,7 @@ const CoachCard = ({ coach, width, height, isFirst, onPress }) => {
 
       <View style={styles.overlay}>
         <Text style={styles.name}>{coach.name}</Text>
+        <Text style={styles.course}>{coach.courseName}</Text>
         <Text style={styles.exp}>{coach.experience}</Text>
       </View>
     </TouchableOpacity>
@@ -300,6 +356,11 @@ const styles = StyleSheet.create({
   exp: {
     color: "#fff",
     fontSize: 16,
+    fontFamily: "Abel",
+  },
+  course: {
+    color: "#FAFF5D",
+    fontSize: 13,
     fontFamily: "Abel",
   },
 });
